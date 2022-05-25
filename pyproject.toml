@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "multimodal-reference"
+version = "0.1.0"
+description = ""
+authors = ["nobu-g <ueda-n127@hotmail.co.jp>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.dev-dependencies]
+ipdb = "^0.13.9"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
