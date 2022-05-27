@@ -306,7 +306,7 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    torch.set_deterministic(True)
+    # torch.set_deterministic(True)
 
     # Build the model
     model, criterion, contrastive_criterion, qa_criterion, weight_dict = build_model(args)
@@ -637,7 +637,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("DETR training and evaluation script", parents=[get_args_parser()])
-    args = parser.parse_args()
-    if args.output_dir:
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    main(args)
+    _args = parser.parse_args()
+    if _args.output_dir:
+        Path(_args.output_dir).mkdir(parents=True, exist_ok=True)
+    main(_args)
