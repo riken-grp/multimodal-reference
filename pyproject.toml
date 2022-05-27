@@ -5,8 +5,9 @@ description = ""
 authors = ["nobu-g <ueda-n127@hotmail.co.jp>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9,<3.11"
 tqdm = "^4.64.0"
+rhoknp = "^0.1.0"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.9"

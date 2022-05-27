@@ -196,6 +196,14 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
+name = "rhoknp"
+version = "0.1.0"
+description = "Yet another Python binding for Juman++/KNP"
+category = "main"
+optional = false
+python-versions = ">=3.9,<3.11"
+
+[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -265,8 +273,8 @@ python-versions = "*"
 
 [metadata]
 lock-version = "1.1"
-python-versions = "^3.9"
-content-hash = "b2b8620056d0822d7aef9139a002ef963d986b657e13434c628a475047c451ed"
+python-versions = ">=3.9,<3.11"
+content-hash = "e3edfc0b5e816d0b130d363f4b43a77535a2ebe907a9e82f20d28313fd38e9d0"
 
 [metadata.files]
 appnope = [
@@ -335,6 +343,10 @@ pure-eval = [
 pygments = [
     {file = "Pygments-2.12.0-py3-none-any.whl", hash = "sha256:dc9c10fb40944260f6ed4c688ece0cd2048414940f1cea51b8b226318411c519"},
     {file = "Pygments-2.12.0.tar.gz", hash = "sha256:5eb116118f9612ff1ee89ac96437bb6b49e8f04d8a13b514ba26f620208e26eb"},
+]
+rhoknp = [
+    {file = "rhoknp-0.1.0-py3-none-any.whl", hash = "sha256:0ffc6f1d8d2415e834ae0c046008fd7ca2cc65338ae1a92202eeeb12a27ff791"},
+    {file = "rhoknp-0.1.0.tar.gz", hash = "sha256:90e7b169b6b349bee09d7b4cfc74a348f69ef49c8268150483d1e6aeb945df58"},
 ]
 six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
