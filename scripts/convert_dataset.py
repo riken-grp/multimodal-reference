@@ -2,6 +2,8 @@ import argparse
 from pathlib import Path
 import json
 
+from tqdm import tqdm
+
 from flickr30k_entities_utils import get_sentence_data, get_sentence_data_ja, get_annotations
 
 
@@ -82,7 +84,7 @@ def main():
 
     all_images = []
     all_annotations = []
-    for image_id in image_ids:
+    for image_id in tqdm(image_ids):
         if args.lang == 'en':
             sentence_data = get_sentence_data(sentences_dir / f'{image_id}.txt')
         else:
