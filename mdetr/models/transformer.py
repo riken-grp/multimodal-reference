@@ -14,7 +14,7 @@ from typing import List, Optional
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
-from transformers import RobertaModel, RobertaTokenizerFast
+from transformers import AutoModel, AutoTokenizer
 
 
 class Transformer(nn.Module):
@@ -51,8 +51,8 @@ class Transformer(nn.Module):
 
         self._reset_parameters()
 
-        self.tokenizer = RobertaTokenizerFast.from_pretrained(text_encoder_type)
-        self.text_encoder = RobertaModel.from_pretrained(text_encoder_type)
+        self.tokenizer = AutoTokenizer.from_pretrained(text_encoder_type)
+        self.text_encoder = AutoModel.from_pretrained(text_encoder_type)
 
         if freeze_text_encoder:
             for p in self.text_encoder.parameters():
@@ -98,9 +98,9 @@ class Transformer(nn.Module):
             if self.CLS is not None:
                 # We add a CLS token to the image, to be used for contrastive loss
 
-                CLS = self.CLS.weight.view(1, 1, -1).repeat(1, bs, 1)
+                cls = self.CLS.weight.view(1, 1, -1).repeat(1, bs, 1)
                 # Add the CLS token to the incoming features
-                src = torch.cat((CLS, src))
+                src = torch.cat((cls, src))
 
                 # Adding zeros as the first token in the sequence to be compatible with the CLS token
                 pos_embed = torch.cat((torch.zeros(1, bs, self.d_model, device=device), pos_embed))
@@ -191,7 +191,6 @@ class TransformerEncoder(nn.Module):
         src_key_padding_mask: Optional[Tensor] = None,
         pos: Optional[Tensor] = None,
     ):
-
         output = src
 
         for layer in self.layers:

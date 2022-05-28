@@ -11,7 +11,7 @@ from typing import Any, Callable, Optional, Tuple
 
 from PIL import Image
 from torchvision.datasets.vision import VisionDataset
-from transformers import RobertaTokenizerFast
+from transformers import AutoTokenizer
 
 from .coco import ConvertCocoPolysToMask, make_coco_transforms
 
@@ -105,7 +105,7 @@ def build(image_set, args):
 
     ann_file = Path(args.gqa_ann_path) / f"final_mixed_{image_set}.json"
 
-    tokenizer = RobertaTokenizerFast.from_pretrained(args.text_encoder_type)
+    tokenizer = AutoTokenizer.from_pretrained(args.text_encoder_type)
     dataset = MixedDetection(
         coco_img_dir,
         vg_img_dir,

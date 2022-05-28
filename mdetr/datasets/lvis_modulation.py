@@ -1,7 +1,7 @@
 # Copyright (c) Aishwarya Kamath & Nicolas Carion. Licensed under the Apache License 2.0. All Rights Reserved
 from pathlib import Path
 
-from transformers import RobertaTokenizerFast
+from transformers import AutoTokenizer
 
 import datasets.transforms as T
 
@@ -20,7 +20,7 @@ def build(image_set, args):
     else:
         ann_file = Path(args.modulated_lvis_ann_path) / f"finetune_lvis{args.lvis_subset}_{image_set}.json"
 
-    tokenizer = RobertaTokenizerFast.from_pretrained(args.text_encoder_type)
+    tokenizer = AutoTokenizer.from_pretrained(args.text_encoder_type)
     dataset = LvisModulatedDetection(
         img_dir,
         ann_file,

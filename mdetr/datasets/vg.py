@@ -6,7 +6,7 @@ Mostly copy-paste from https://github.com/pytorch/vision/blob/13b35ff/references
 """
 from pathlib import Path
 
-from transformers import RobertaTokenizerFast
+from transformers import AutoTokenizer
 
 from .coco import ModulatedDetection, make_coco_transforms
 
@@ -21,7 +21,7 @@ def build(image_set, args):
 
     ann_file = Path(args.gqa_ann_path) / f"final_vg_{image_set}.json"
 
-    tokenizer = RobertaTokenizerFast.from_pretrained(args.text_encoder_type)
+    tokenizer = AutoTokenizer.from_pretrained(args.text_encoder_type)
     dataset = VGDetection(
         img_dir,
         ann_file,

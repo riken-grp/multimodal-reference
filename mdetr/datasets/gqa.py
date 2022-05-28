@@ -9,7 +9,7 @@ from pathlib import Path
 
 import torch
 import torchvision
-from transformers import RobertaTokenizerFast
+from transformers import AutoTokenizer
 
 from .coco import ConvertCocoPolysToMask, ModulatedDetection, make_coco_transforms
 
@@ -102,7 +102,7 @@ def build(image_set, args):
     img_dir = Path(args.vg_img_path)
     assert img_dir.exists(), f"provided VG img path {img_dir} does not exist"
 
-    tokenizer = RobertaTokenizerFast.from_pretrained(args.text_encoder_type)
+    tokenizer = AutoTokenizer.from_pretrained(args.text_encoder_type)
 
     if args.do_qa:
         assert args.gqa_split_type is not None

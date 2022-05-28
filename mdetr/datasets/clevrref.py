@@ -6,7 +6,7 @@ from pathlib import Path
 
 import torch
 import torch.utils.data
-from transformers import RobertaTokenizerFast
+from transformers import AutoTokenizer
 
 import util.dist as dist
 from datasets.clevr import make_clevr_transforms
@@ -92,7 +92,7 @@ class ClevrRefEvaluator(object):
 
 
 def build(image_set, args):
-    tokenizer = RobertaTokenizerFast.from_pretrained(args.text_encoder_type)
+    tokenizer = AutoTokenizer.from_pretrained(args.text_encoder_type)
 
     img_dir = Path(args.clevr_img_path) / f"{image_set}"
     ann_file = Path(args.clevr_ann_path) / f"{image_set}.json"
