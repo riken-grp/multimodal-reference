@@ -127,11 +127,11 @@ def get_sentence_data_ja(fn):
                         new_phrase += ' '
                         word_idx += 1
                     char_idx += 1
-                chunk['phrase'] = new_phrase.strip()
+                chunk['phrase'] = new_phrase.strip(' ')
                 phrases.append(chunk)
         assert 'EN' not in sentence
         annotations.append({
-            'sentence': sentence.strip(),
+            'sentence': sentence.strip(' '),
             'phrases': phrases
         })
     return annotations
