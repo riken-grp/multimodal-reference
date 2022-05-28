@@ -95,7 +95,7 @@ def get_sentence_data_ja(fn):
             raw_sentence += text
             chunks.append(text)
             # match の中身を追加
-            raw_sentence += match.group(3)
+            raw_sentence += match.group('words')
             chunks.append({
                 'phrase': match.group('words'),
                 'phrase_id': match.group('id'),
