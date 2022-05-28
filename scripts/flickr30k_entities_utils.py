@@ -91,9 +91,10 @@ def get_sentence_data_ja(fn):
         matches: list[re.Match] = list(re.finditer(tag_pat, line))
         for match in matches:
             # chunk 前を追加
-            text = line[sidx:match.start()]
-            raw_sentence += text
-            chunks.append(text)
+            if sidx < match.start():
+                text = line[sidx:match.start()]
+                raw_sentence += text
+                chunks.append(text)
             # match の中身を追加
             raw_sentence += match.group('words')
             chunks.append({
@@ -109,19 +110,19 @@ def get_sentence_data_ja(fn):
         char_idx = word_idx = 0
         for chunk in chunks:
             if isinstance(chunk, str):
-                for char in chunk:
+                for i, char in enumerate(chunk):
                     sentence += char
-                    if is_word_ends[char_idx]:
+                    if is_word_ends[char_idx] or i == len(chunk) - 1:
                         sentence += ' '
                         word_idx += 1
                     char_idx += 1
             else:
                 new_phrase = ''
                 chunk['first_word_index'] = word_idx
-                for char in chunk['phrase']:
+                for i, char in enumerate(chunk['phrase']):
                     sentence += char
                     new_phrase += char
-                    if is_word_ends[char_idx]:
+                    if is_word_ends[char_idx] or i == len(chunk['phrase']) - 1:
                         sentence += ' '
                         new_phrase += ' '
                         word_idx += 1
@@ -130,7 +131,7 @@ def get_sentence_data_ja(fn):
                 phrases.append(chunk)
         assert 'EN' not in sentence
         annotations.append({
-            'sentence': sentence,
+            'sentence': sentence.strip(),
             'phrases': phrases
         })
     return annotations
