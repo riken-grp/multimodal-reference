@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 import json
 
-from flickr30k_entities_utils import get_sentence_data, get_annotations
+from flickr30k_entities_utils import get_sentence_data, get_sentence_data_ja, get_annotations
 
 
 def convert(sentence_data: dict, annotation_data: dict, image_id: str, sent_id_from: int = 0, ann_id_from: int = 0):
@@ -71,6 +71,7 @@ def main():
     parser.add_argument('--id-file', '-i', type=str, help='Path to the file containing image ids.')
     parser.add_argument('--sent-id-offset', type=int, default=0, help='Offset for sentence ids.')
     parser.add_argument('--ann-id-offset', type=int, default=0, help='Offset for annotation ids.')
+    parser.add_argument('--lang', choices=['en', 'ja'], default='en', help='Language of the captions.')
     args = parser.parse_args()
 
     sentences_dir = Path(args.sentences_dir)
@@ -82,7 +83,10 @@ def main():
     all_images = []
     all_annotations = []
     for image_id in image_ids:
-        sentence_data = get_sentence_data(sentences_dir / f'{image_id}.txt')
+        if args.lang == 'en':
+            sentence_data = get_sentence_data(sentences_dir / f'{image_id}.txt')
+        else:
+            sentence_data = get_sentence_data_ja(sentences_dir / f'{image_id}.txt')
         annotation_data = get_annotations(annotations_dir / f'{image_id}.xml')
         images, annotations = convert(
             sentence_data,

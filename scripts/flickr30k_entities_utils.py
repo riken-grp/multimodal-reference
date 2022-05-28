@@ -1,6 +1,10 @@
 # copied from https://github.com/BryanPlummer/flickr30k_entities/blob/master/flickr30k_entities_utils.py
 
 import xml.etree.ElementTree as ET
+from pathlib import Path
+import re
+
+from rhoknp import Jumanpp
 
 
 def get_sentence_data(fn):
@@ -62,14 +66,83 @@ def get_sentence_data(fn):
 
         sentence_data = {'sentence': ' '.join(words), 'phrases': []}
         for index, phrase, p_id, p_type in zip(first_word, phrases, phrase_id, phrase_type):
-            sentence_data['phrases'].append({'first_word_index': index,
-                                             'phrase': phrase,
-                                             'phrase_id': p_id,
-                                             'phrase_type': p_type})
+            sentence_data['phrases'].append(
+                {
+                    'first_word_index': index,
+                    'phrase': phrase,
+                    'phrase_id': p_id,
+                    'phrase_type': p_type
+                }
+            )
 
         annotations.append(sentence_data)
 
     return annotations
+
+
+def get_sentence_data_ja(fn):
+    # exapmle: 5:[/EN#550/clothing 赤い服]を着た4:[/EN#549/people 男]が6:[/EN#551/other 綱]を握って見守っている間に、1:[/EN#547/people 数人のクライマー]が2:[/EN#554/other 列]をなして3:[/EN#548/other 岩]をよじ登っている。
+    tag_pat = re.compile(r'\d+:\[/EN#(\d+)/([a-z]+) ([^]]+)]')
+    annotations = []
+    for line in Path(fn).read_text().splitlines():
+        chunks = []
+        raw_sentence = ''
+        sidx = 0
+        matches: list[re.Match] = list(re.finditer(tag_pat, line))
+        for match in matches:
+            # chunk 前を追加
+            text = line[sidx:match.start()]
+            raw_sentence += text
+            chunks.append(text)
+            # match の中身を追加
+            raw_sentence += match.group(3)
+            chunks.append({
+                'phrase': match.group(3),
+                'phrase_id': match.group(1),
+                'phrase_type': match.group(2),
+            })
+            sidx = match.end()
+        raw_sentence += line[sidx:]
+        is_word_ends = _get_is_word_ends(raw_sentence)
+        sentence = ''
+        phrases = []
+        char_idx = word_idx = 0
+        for chunk in chunks:
+            if isinstance(chunk, str):
+                for char in chunk:
+                    sentence += char
+                    if is_word_ends[char_idx]:
+                        sentence += ' '
+                        word_idx += 1
+                    char_idx += 1
+            else:
+                new_phrase = ''
+                chunk['first_word_index'] = word_idx
+                for char in chunk['phrase']:
+                    sentence += char
+                    new_phrase += char
+                    if is_word_ends[char_idx]:
+                        sentence += ' '
+                        new_phrase += ' '
+                        word_idx += 1
+                    char_idx += 1
+                chunk['phrase'] = new_phrase.strip()
+                phrases.append(chunk)
+        annotations.append({
+            'sentence': sentence,
+            'phrases': phrases
+        })
+    return annotations
+
+
+def _get_is_word_ends(sentence: str) -> list[bool]:
+    morphemes = Jumanpp().apply_to_sentence(sentence).morphemes
+    is_word_ends = [False] * len(sentence)
+    cum_lens = -1
+    for m in morphemes:
+        cum_lens += len(m.text)
+        is_word_ends[cum_lens] = True
+    return is_word_ends
 
 
 def get_annotations(fn):
