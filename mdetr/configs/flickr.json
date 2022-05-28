@@ -2,7 +2,7 @@
   "combine_datasets": ["flickr"],
   "combine_datasets_val": ["flickr"],
   "GT_type" : "separate",
-  "flickr_img_path" : "",
-  "flickr_dataset_path" : "",
-  "flickr_ann_path" : "mdetr_annotations/"
+  "flickr_img_path" : "data/flickr30k-images",
+  "flickr_dataset_path" : "data/flickr30k_entities",
+  "flickr_ann_path" : "data/mdetr_annotations"
 }
