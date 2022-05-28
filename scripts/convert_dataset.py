@@ -15,7 +15,7 @@ def convert(sentence_data: dict, annotation_data: dict, image_id: str, sent_id_f
     for idx, sent in enumerate(sentence_data):
         # print(sent)
         sentence: str = sent['sentence']
-        words = sentence.split()
+        words = sentence.split(' ')
         word_to_char_idx = {}
         char_idx = 0
         for word_idx, word in enumerate(words):
