@@ -82,7 +82,7 @@ def get_sentence_data(fn):
 
 def get_sentence_data_ja(fn):
     # exapmle: 5:[/EN#550/clothing 赤い服]を着た4:[/EN#549/people 男]が6:[/EN#551/other 綱]を握って見守っている間に、1:[/EN#547/people 数人のクライマー]が2:[/EN#554/other 列]をなして3:[/EN#548/other 岩]をよじ登っている。
-    tag_pat = re.compile(r'\d+:\[/EN#(\d+)/([a-z]+) ([^]]+)]')
+    tag_pat = re.compile(r'\d+:\[/EN#(?P<id>\d+)(/(?P<type>[a-z]+))+ (?P<words>[^]]+)]')
     annotations = []
     for line in Path(fn).read_text().splitlines():
         chunks = []
@@ -97,9 +97,9 @@ def get_sentence_data_ja(fn):
             # match の中身を追加
             raw_sentence += match.group(3)
             chunks.append({
-                'phrase': match.group(3),
-                'phrase_id': match.group(1),
-                'phrase_type': match.group(2),
+                'phrase': match.group('words'),
+                'phrase_id': match.group('id'),
+                'phrase_type': match.group('type'),
             })
             sidx = match.end()
         raw_sentence += line[sidx:]
@@ -128,6 +128,7 @@ def get_sentence_data_ja(fn):
                     char_idx += 1
                 chunk['phrase'] = new_phrase.strip()
                 phrases.append(chunk)
+        assert 'EN' not in sentence
         annotations.append({
             'sentence': sentence,
             'phrases': phrases
