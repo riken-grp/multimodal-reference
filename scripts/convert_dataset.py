@@ -27,7 +27,7 @@ def convert(sentence_data: dict, annotation_data: dict, image_id: str, sent_id_f
                 continue
             first_char_index: int = word_to_char_idx[phrase['first_word_index']]
             phrase_surf: str = phrase['phrase']
-            assert sentence[first_char_index:].startswith(phrase_surf)
+            assert sentence[first_char_index:].startswith(phrase_surf), f"first index mismatch in '{image_id}'"
             char_spans[phrase['phrase_id']] = [[first_char_index, first_char_index + len(phrase_surf)]]
 
         image = {
