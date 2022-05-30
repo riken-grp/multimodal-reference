@@ -261,7 +261,7 @@ def get_args_parser():
 
     parser.add_argument("--test", action="store_true", help="Whether to run evaluation on val or test set")
     parser.add_argument("--test_type", type=str, default="test", choices=("testA", "testB", "test"))
-    parser.add_argument("--output-dir", default="", help="path where to save, empty for no saving")
+    parser.add_argument("--output_dir", default="", help="path where to save, empty for no saving")
     parser.add_argument("--device", default="cuda", help="device to use for training / testing")
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--resume", default="", help="resume from checkpoint")
@@ -443,9 +443,13 @@ def main(args):
         print("loading from", args.load)
         checkpoint = torch.load(args.load, map_location="cpu")
         if "model_ema" in checkpoint:
-            model_without_ddp.load_state_dict(checkpoint["model_ema"], strict=False)
+            state_dict = checkpoint["model_ema"]
         else:
-            model_without_ddp.load_state_dict(checkpoint["model"], strict=False)
+            state_dict = checkpoint["model"]
+        model_without_ddp.load_state_dict(
+            {k: v for k, v in state_dict.items() if not k.startswith("transformer.text_encoder")},
+            strict=False,
+        )
 
         if args.ema:
             model_ema = deepcopy(model_without_ddp)
