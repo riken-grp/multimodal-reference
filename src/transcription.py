@@ -81,7 +81,7 @@ class SlipToken(Token):
         return ''.join(str(t) for t in self.correct)
 
 
-class Speaker(Enum):
+class Speaker(str, Enum):
     MASTER = '主人'
     ROBOT = 'ロボット'
 
