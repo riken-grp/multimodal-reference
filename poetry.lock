@@ -202,6 +202,13 @@ description = "Yet another Python binding for Juman++/KNP"
 category = "main"
 optional = false
 python-versions = ">=3.9,<3.11"
+develop = false
+
+[package.source]
+type = "git"
+url = "https://github.com/ku-nlp/rhoknp.git"
+reference = "main"
+resolved_reference = "859e5dea0e7044c3d5f40456dd973c741fa363a7"
 
 [[package]]
 name = "six"
@@ -274,7 +281,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.9,<3.11"
-content-hash = "e3edfc0b5e816d0b130d363f4b43a77535a2ebe907a9e82f20d28313fd38e9d0"
+content-hash = "92fb2e005a3dc82cf539c9c43a9879f56fb589b8b08cac1204afd77961e08c53"
 
 [metadata.files]
 appnope = [
@@ -344,10 +351,7 @@ pygments = [
     {file = "Pygments-2.12.0-py3-none-any.whl", hash = "sha256:dc9c10fb40944260f6ed4c688ece0cd2048414940f1cea51b8b226318411c519"},
     {file = "Pygments-2.12.0.tar.gz", hash = "sha256:5eb116118f9612ff1ee89ac96437bb6b49e8f04d8a13b514ba26f620208e26eb"},
 ]
-rhoknp = [
-    {file = "rhoknp-0.1.0-py3-none-any.whl", hash = "sha256:0ffc6f1d8d2415e834ae0c046008fd7ca2cc65338ae1a92202eeeb12a27ff791"},
-    {file = "rhoknp-0.1.0.tar.gz", hash = "sha256:90e7b169b6b349bee09d7b4cfc74a348f69ef49c8268150483d1e6aeb945df58"},
-]
+rhoknp = []
 six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
