@@ -81,7 +81,7 @@ class SlipToken(Token):
         return ''.join(str(t) for t in self.correct)
 
 
-class Speaker(Enum):
+class Speaker(str, Enum):
     MASTER = '主人'
     ROBOT = 'ロボット'
 
@@ -172,33 +172,39 @@ class Parser:
             raise ValueError(f'Expected {pattern}')
 
 
+def parse_transcription_file(path: Path) -> list[Transcription]:
+    transcriptions = []
+    for line in path.read_text().splitlines():
+        # columns:
+        # １．話者
+        # \t
+        # ２．開始時間（時:分:秒.ミリ秒）
+        # ３．開始時間（秒.ミリ秒）
+        # ４．開始時間（ミリ秒）
+        # ５．終了時間（時:分:秒.ミリ秒）
+        # ６．終了時間（秒.ミリ秒）
+        # ７．終了時間（ミリ秒）
+        # ８．間隔（時:分:秒.ミリ秒）
+        # ９．間隔（秒.ミリ秒）
+        # １０．間隔（ミリ秒）
+        # １１．発話書き起こし
+        speaker, _, _, _, start_time, _, _, end_time, _, _, duration, raw_utterance = line.split('\t')
+        assert int(end_time) - int(start_time) == int(duration)
+        parser = Parser(raw_utterance)
+        transcriptions.append(
+            Transcription(parser.parse(), Speaker(speaker), int(start_time), int(end_time), int(duration))
+        )
+    return transcriptions
+
+
 def main():
     data_dir = Path(sys.argv[1])
+    transcriptions = []
     for transcription_dir in (d for d in data_dir.glob('*') if d.is_dir() and re.match(r'\d{8}-\d{8}-\d', d.name)):
         scenario_id = transcription_dir.name
         latest_file = sorted(transcription_dir.glob(f'{scenario_id}-*.txt'), key=lambda p: p.name)[-1]
-        transcriptions = []
-        for line in latest_file.read_text().splitlines():
-            # columns:
-            # １．話者
-            # \t
-            # ２．開始時間（時:分:秒.ミリ秒）
-            # ３．開始時間（秒.ミリ秒）
-            # ４．開始時間（ミリ秒）
-            # ５．終了時間（時:分:秒.ミリ秒）
-            # ６．終了時間（秒.ミリ秒）
-            # ７．終了時間（ミリ秒）
-            # ８．間隔（時:分:秒.ミリ秒）
-            # ９．間隔（秒.ミリ秒）
-            # １０．間隔（ミリ秒）
-            # １１．発話書き起こし
-            speaker, _, _, _, start_time, _, _, end_time, _, _, duration, raw_utterance = line.split('\t')
-            assert int(end_time) - int(start_time) == int(duration)
-            parser = Parser(raw_utterance)
-            transcriptions.append(
-                Transcription(parser.parse(), Speaker(speaker), int(start_time), int(end_time), int(duration))
-            )
-        print(transcriptions)
+        transcriptions.extend(parse_transcription_file(latest_file))
+    print(transcriptions)
 
 
 if __name__ == '__main__':
