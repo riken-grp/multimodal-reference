@@ -1,13 +1,16 @@
 import argparse
 from collections import defaultdict
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn as nn
 import torchvision.transforms as tt
 from PIL import Image
 from matplotlib.patches import Polygon
 from skimage.measure import find_contours
+from transformers import CharSpan
 
 from hubconf import _make_detr
 
@@ -22,14 +25,14 @@ transform = tt.Compose([
 
 
 # for output bounding box post-processing
-def box_cxcywh_to_xyxy(x):
+def box_cxcywh_to_xyxy(x: torch.Tensor) -> torch.Tensor:
     x_c, y_c, w, h = x.unbind(1)
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
     return torch.stack(b, dim=1)
 
 
-def rescale_bboxes(out_bbox, size):
+def rescale_bboxes(out_bbox: torch.Tensor, size) -> torch.Tensor:
     img_w, img_h = size
     b = box_cxcywh_to_xyxy(out_bbox)
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
@@ -56,7 +59,7 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def plot_results(pil_img, scores, boxes, labels, masks=None):
+def plot_results(pil_img: Image, scores, boxes, labels: List[str], masks=None):
     plt.figure(figsize=(16, 10))
     np_image = np.array(pil_img)
     ax = plt.gca()
@@ -109,34 +112,40 @@ def plot_results(pil_img, scores, boxes, labels, masks=None):
 #         ax.text(b[0], b[1], text, fontsize=15, bbox=dict(facecolor='white', alpha=0.8))
 
 
-def plot_inference(im: Image, caption, model):
+def plot_inference(im: Image, caption: str, model: nn.Module):
     # mean-std normalize the input image (batch-size: 1)
     if torch.cuda.is_available():
-        img = transform(im).unsqueeze(0).cuda()
+        img: torch.Tensor = transform(im).unsqueeze(0).cuda()  # (1, ch, H, W)
     else:
-        img = transform(im).unsqueeze(0)
+        img: torch.Tensor = transform(im).unsqueeze(0)
 
     # propagate through the model
     memory_cache = model(img, [caption], encode_and_save=True)
-    outputs = model(img, [caption], encode_and_save=False, memory_cache=memory_cache)
+    # dict keys: 'pred_logits', 'pred_boxes', 'proj_queries', 'proj_tokens', 'tokenized'
+    # pred_logits: (1, cand, seq)
+    # pred_boxes: (1, cand, 4)
+    # proj_queries: (1, cand, 64)
+    # proj_tokens: (1, 28, 64)
+    # tokenized: BatchEncoding
+    outputs: dict = model(img, [caption], encode_and_save=False, memory_cache=memory_cache)
 
     # keep only predictions with 0.7+ confidence
-    probs = 1 - outputs['pred_logits'].softmax(-1)[0, :, -1].cpu()
-    keep = (probs > 0.7).cpu()
+    probs = 1 - outputs['pred_logits'].softmax(dim=2)[0, :, -1].cpu()  # (cand)
+    keep = (probs > 0.7)  # (cand)
 
     # convert boxes from [0; 1] to image scales
-    bboxes_scaled = rescale_bboxes(outputs['pred_boxes'].cpu()[0, keep], im.size)
-
+    bboxes_scaled = rescale_bboxes(outputs['pred_boxes'].cpu()[0, keep], im.size)  # (kept, 4)
+    import ipdb; ipdb.set_trace()
     # Extract the text spans predicted by each box
-    positive_tokens: list = (outputs["pred_logits"].cpu()[0, keep].softmax(-1) > 0.1).nonzero().tolist()
-    predicted_spans = defaultdict(str)
+    positive_tokens: list = (outputs['pred_logits'].cpu()[0, keep].softmax(-1) > 0.1).nonzero().tolist()  # (140, 2)
+    predicted_spans: Dict[int, str] = defaultdict(str)
     for tok in positive_tokens:
         item, pos = tok
         if pos < 255:
-            span = memory_cache["tokenized"].token_to_chars(0, pos)
+            span: CharSpan = memory_cache["tokenized"].token_to_chars(0, pos)
             predicted_spans[item] += caption[span.start:span.end]
 
-    labels = [predicted_spans[k] for k in sorted(predicted_spans.keys())]
+    labels: List[str] = [predicted_spans[k] for k in sorted(predicted_spans.keys())]
     plot_results(im, probs[keep], bboxes_scaled, labels)
 
 
