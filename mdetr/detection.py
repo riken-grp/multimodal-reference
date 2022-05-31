@@ -1,24 +1,25 @@
-import torch
-from PIL import Image
-import requests
-import torchvision.transforms as T
-import matplotlib.pyplot as plt
+import argparse
 from collections import defaultdict
-import torch.nn.functional as F
+
+import matplotlib.pyplot as plt
 import numpy as np
-from skimage.measure import find_contours
-from matplotlib import patches,  lines
+import torch
+import torchvision.transforms as tt
+from PIL import Image
 from matplotlib.patches import Polygon
+from skimage.measure import find_contours
+
+from hubconf import _make_detr
 
 torch.set_grad_enabled(False)
 
-
 # standard PyTorch mean-std input image normalization
-transform = T.Compose([
-    T.Resize(800),
-    T.ToTensor(),
-    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+transform = tt.Compose([
+    tt.Resize(800),
+    tt.ToTensor(),
+    tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
+
 
 # for output bounding box post-processing
 def box_cxcywh_to_xyxy(x):
@@ -54,7 +55,7 @@ def apply_mask(image, mask, color, alpha=0.5):
 
 
 def plot_results(pil_img, scores, boxes, labels, masks=None):
-    plt.figure(figsize=(16,10))
+    plt.figure(figsize=(16, 10))
     np_image = np.array(pil_img)
     ax = plt.gca()
     colors = COLORS * 100
@@ -86,22 +87,22 @@ def plot_results(pil_img, scores, boxes, labels, masks=None):
 
 
 def add_res(results, ax, color='green'):
-    #for tt in results.values():
+    # for tt in results.values():
     if True:
         bboxes = results['boxes']
         labels = results['labels']
         scores = results['scores']
-        #keep = scores >= 0.0
-        #bboxes = bboxes[keep].tolist()
-        #labels = labels[keep].tolist()
-        #scores = scores[keep].tolist()
-    #print(torchvision.ops.box_iou(tt['boxes'].cpu().detach(), torch.as_tensor([[xmin, ymin, xmax, ymax]])))
+        # keep = scores >= 0.0
+        # bboxes = bboxes[keep].tolist()
+        # labels = labels[keep].tolist()
+        # scores = scores[keep].tolist()
+    # print(torchvision.ops.box_iou(tt['boxes'].cpu().detach(), torch.as_tensor([[xmin, ymin, xmax, ymax]])))
 
     colors = ['purple', 'yellow', 'red', 'green', 'orange', 'pink']
 
     for i, (b, ll, ss) in enumerate(zip(bboxes, labels, scores)):
         ax.add_patch(plt.Rectangle((b[0], b[1]), b[2] - b[0], b[3] - b[1], fill=False, color=colors[i], linewidth=3))
-        cls_name = ll if isinstance(ll,str) else CLASSES[ll]
+        cls_name = ll if isinstance(ll, str) else CLASSES[ll]
         text = f'{cls_name}: {ss:.2f}'
         print(text)
         ax.text(b[0], b[1], text, fontsize=15, bbox=dict(facecolor='white', alpha=0.8))
@@ -132,21 +133,36 @@ def plot_inference(im, caption, model):
         item, pos = tok
         if pos < 255:
             span = memory_cache["tokenized"].token_to_chars(0, pos)
-            predicted_spans [item] += " " + caption[span.start:span.end]
+            predicted_spans[item] += " " + caption[span.start:span.end]
 
-    labels = [predicted_spans [k] for k in sorted(list(predicted_spans .keys()))]
+    labels = [predicted_spans[k] for k in sorted(list(predicted_spans.keys()))]
     plot_results(im, probas[keep], bboxes_scaled, labels)
 
 
 def main():
-    model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True, return_postprocessor=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', '-m', type=str, help='Path to trained model.')
+    # parser.add_argument('--image-dir', '--img', type=str, help='Path to the directory containing images.')
+    parser.add_argument('--image-path', '--img', type=str, help='Path to the images file.')
+    parser.add_argument('--text', type=str, default='5 people each holding an umbrella',
+                        help='split text to perform grounding.')
+    # parser.add_argument('--dialog-ids', '--id', type=str, help='Path to the file containing dialog ids.')
+    args = parser.parse_args()
+
+    # model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True,
+    #                                       return_postprocessor=True)
+    model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
+    checkpoint = torch.load(args.model, map_location='cpu')
+    model.load_state_dict(checkpoint['model'])
     if torch.cuda.is_available():
         model = model.cuda()
     model.eval()
 
-    url = "http://images.cocodataset.org/val2017/000000281759.jpg"
-    im = Image.open(requests.get(url, stream=True).raw)
-    plot_inference(im, "5 people each holding an umbrella", model)
+    # url = "http://images.cocodataset.org/val2017/000000281759.jpg"
+    # web_image = requests.get(url, stream=True).raw
+    # im = Image.open(web_image)
+    im = Image.open(args.image_path)
+    plot_inference(im, args.text, model)
 
 
 if __name__ == '__main__':
