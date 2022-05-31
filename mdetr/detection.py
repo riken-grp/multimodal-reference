@@ -143,7 +143,10 @@ def plot_inference(im: Image, caption: str, model: nn.Module):
     for tok in positive_tokens:
         item, pos = tok
         if pos < 255:
-            span: CharSpan = memory_cache['tokenized'].token_to_chars(0, pos)
+            try:
+                span: CharSpan = memory_cache['tokenized'].token_to_chars(0, pos)
+            except TypeError:
+                continue
             predicted_spans[item] += ' ' + caption[span.start:span.end]
 
     labels: List[str] = [predicted_spans[k] for k in sorted(predicted_spans.keys())]
