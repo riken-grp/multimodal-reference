@@ -59,7 +59,7 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def plot_results(pil_img: Image, scores, boxes, labels: List[str], masks=None):
+def plot_results(pil_img: Image, scores, boxes: List[List[int]], labels: List[str], masks=None):
     plt.figure(figsize=(16, 10))
     np_image = np.array(pil_img)
     ax = plt.gca()
@@ -67,9 +67,9 @@ def plot_results(pil_img: Image, scores, boxes, labels: List[str], masks=None):
     if masks is None:
         masks = [None] * len(scores)
     assert len(scores) == len(boxes) == len(labels) == len(masks)
-    for score, (xmin, ymin, xmax, ymax), l, mask, color in zip(scores, boxes.tolist(), labels, masks, colors):
+    for score, (xmin, ymin, xmax, ymax), label, mask, color in zip(scores, boxes, labels, masks, colors):
         ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False, color=color, linewidth=3))
-        ax.text(xmin, ymin, f'{l}: {score:0.2f}', fontsize=15, bbox=dict(facecolor='white', alpha=0.8),
+        ax.text(xmin, ymin, f'{label}: {score:0.2f}', fontsize=15, bbox=dict(facecolor='white', alpha=0.8),
                 fontname='Hiragino Maru Gothic Pro')
 
         if mask is None:
@@ -131,22 +131,23 @@ def plot_inference(im: Image, caption: str, model: nn.Module):
 
     # keep only predictions with 0.7+ confidence
     probs = 1 - outputs['pred_logits'].softmax(dim=2)[0, :, -1].cpu()  # (cand)
-    keep = (probs > 0.7)  # (cand)
+    keep = (probs > 0.8)  # (cand)
 
     # convert boxes from [0; 1] to image scales
     bboxes_scaled = rescale_bboxes(outputs['pred_boxes'].cpu()[0, keep], im.size)  # (kept, 4)
-    import ipdb; ipdb.set_trace()
+
     # Extract the text spans predicted by each box
-    positive_tokens: list = (outputs['pred_logits'].cpu()[0, keep].softmax(-1) > 0.1).nonzero().tolist()  # (140, 2)
+    # (140, 2)
+    positive_tokens = torch.nonzero(outputs['pred_logits'].cpu()[0, keep].softmax(-1) > 0.1).tolist()
     predicted_spans: Dict[int, str] = defaultdict(str)
     for tok in positive_tokens:
         item, pos = tok
         if pos < 255:
-            span: CharSpan = memory_cache["tokenized"].token_to_chars(0, pos)
-            predicted_spans[item] += caption[span.start:span.end]
+            span: CharSpan = memory_cache['tokenized'].token_to_chars(0, pos)
+            predicted_spans[item] += ' ' + caption[span.start:span.end]
 
     labels: List[str] = [predicted_spans[k] for k in sorted(predicted_spans.keys())]
-    plot_results(im, probs[keep], bboxes_scaled, labels)
+    plot_results(im, probs[keep], bboxes_scaled.tolist(), labels)
 
 
 def main():
