@@ -508,7 +508,7 @@ def main(args):
     if args.eval:
         test_stats = {}
         test_model = model_ema if model_ema is not None else model
-        for i, item in enumerate(val_tuples):
+        for item in val_tuples:
             evaluator_list = build_evaluator_list(item.base_ds, item.dataset_name)
             postprocessors = build_postprocessors(args, item.dataset_name)
             item = item._replace(evaluator_list=evaluator_list)
