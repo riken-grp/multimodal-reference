@@ -107,9 +107,12 @@ def add_res(results, ax, color='green'):
         ax.text(b[0], b[1], text, fontsize=15, bbox=dict(facecolor='white', alpha=0.8))
 
 
-def plot_inference(im, caption):
+def plot_inference(im, caption, model):
     # mean-std normalize the input image (batch-size: 1)
-    img = transform(im).unsqueeze(0).cuda()
+    if torch.cuda.is_available():
+        img = transform(im).unsqueeze(0).cuda()
+    else:
+        img = transform(im).unsqueeze(0)
 
     # propagate through the model
     memory_cache = model(img, [caption], encode_and_save=True)
@@ -137,12 +140,13 @@ def plot_inference(im, caption):
 
 def main():
     model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True, return_postprocessor=True)
-    model = model.cuda()
+    if torch.cuda.is_available():
+        model = model.cuda()
     model.eval()
 
     url = "http://images.cocodataset.org/val2017/000000281759.jpg"
     im = Image.open(requests.get(url, stream=True).raw)
-    plot_inference(im, "5 people each holding an umbrella")
+    plot_inference(im, "5 people each holding an umbrella", model)
 
 
 if __name__ == '__main__':
