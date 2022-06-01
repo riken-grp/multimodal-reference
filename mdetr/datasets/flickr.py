@@ -14,7 +14,6 @@ class FlickrDetection(ModulatedDetection):
 
 
 def build(image_set, args):
-
     img_dir = Path(args.flickr_img_path) / f"{image_set}"
 
     if args.GT_type == "merged":
@@ -37,6 +36,6 @@ def build(image_set, args):
         return_masks=False,
         return_tokens=True,  # args.contrastive_align_loss,
         tokenizer=tokenizer,
-        is_train=image_set=="train"
+        is_train=image_set == "train"
     )
     return dataset

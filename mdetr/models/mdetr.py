@@ -122,17 +122,17 @@ class MDETR(nn.Module):
                             dictionnaries containing the two above keys for each decoder layer.
         """
         if not isinstance(samples, NestedTensor):
-            samples = NestedTensor.from_tensor_list(samples)
+            samples = NestedTensor.from_tensor_list(samples)  # (b, 3, H, W)
 
         if encode_and_save:
             assert memory_cache is None
-            features, pos = self.backbone(samples)
-            src, mask = features[-1].decompose()
+            features, pos = self.backbone(samples)  # [(b, hid, 25, 45)], [(b, 384, 25, 45)]
+            src, mask = features[-1].decompose()  # (b, 384, 25, 45), (b, 25, 45)
             query_embed = self.query_embed.weight
             if self.qa_dataset is not None:
                 query_embed = torch.cat([query_embed, self.qa_embed.weight], 0)
             memory_cache = self.transformer(
-                self.input_proj(src),
+                self.input_proj(src),  # (b, 256, 25, 45)
                 mask,
                 query_embed,
                 pos[-1],

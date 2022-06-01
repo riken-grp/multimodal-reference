@@ -4,8 +4,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 import re
 
-from rhoknp import Jumanpp
-
 
 def get_sentence_data(fn):
     """
@@ -104,47 +102,24 @@ def get_sentence_data_ja(fn):
             })
             sidx = match.end()
         raw_sentence += line[sidx:]
-        is_word_ends = _get_is_word_ends(raw_sentence)
         sentence = ''
         phrases = []
-        char_idx = word_idx = 0
+        char_idx = 0
         for chunk in chunks:
             if isinstance(chunk, str):
-                for i, char in enumerate(chunk):
-                    sentence += char
-                    if is_word_ends[char_idx] or i == len(chunk) - 1:
-                        sentence += ' '
-                        word_idx += 1
-                    char_idx += 1
+                sentence += chunk
+                char_idx += len(chunk)
             else:
-                new_phrase = ''
-                chunk['first_word_index'] = word_idx
-                for i, char in enumerate(chunk['phrase']):
-                    sentence += char
-                    new_phrase += char
-                    if is_word_ends[char_idx] or i == len(chunk['phrase']) - 1:
-                        sentence += ' '
-                        new_phrase += ' '
-                        word_idx += 1
-                    char_idx += 1
-                chunk['phrase'] = new_phrase.strip(' ')
+                chunk['first_char_index'] = char_idx
+                sentence += chunk['phrase']
+                char_idx += len(chunk['phrase'])
                 phrases.append(chunk)
         assert 'EN' not in sentence
         annotations.append({
             'sentence': sentence.strip(' '),
-            'phrases': phrases
+            'phrases': phrases,
         })
     return annotations
-
-
-def _get_is_word_ends(sentence: str) -> list[bool]:
-    morphemes = Jumanpp().apply_to_sentence(sentence).morphemes
-    is_word_ends = [False] * len(sentence)
-    cum_lens = -1
-    for m in morphemes:
-        cum_lens += len(m.text)
-        is_word_ends[cum_lens] = True
-    return is_word_ends
 
 
 def get_annotations(fn):
