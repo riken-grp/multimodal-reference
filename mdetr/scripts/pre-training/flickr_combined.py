@@ -314,10 +314,10 @@ def convert(
             for global_phrase_id, phrase in enumerate(sent["phrases"]):
                 phraseid2entityid[global_phrase_id] = int(phrase["phrase_id"])
                 entityid2phraseid[int(phrase["phrase_id"])].append(global_phrase_id)
-                first_word = phrase["first_word_index"]
-                beg = sum([len(x) for x in sentence.split()[:first_word]]) + first_word
-                spans[global_phrase_id] = (beg, beg + len(phrase["phrase"]))
-                assert sentence[beg : beg + len(phrase["phrase"])] == phrase["phrase"]
+                first_char_index = phrase["first_char_index"]
+                begin, end = first_char_index, first_char_index + len(phrase["phrase"])
+                spans[global_phrase_id] = (begin, end)
+                assert sentence[begin : end] == phrase["phrase"]
 
             all_boxes_in_sent = []
             for ent_id in entity_ids:
