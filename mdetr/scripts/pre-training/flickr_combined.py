@@ -376,7 +376,7 @@ def convert(
         filename = f"final_flickr_separateGT_{subset}.json"
 
     with open(output_path / filename, "w") as j_file:
-        json.dump(ds, j_file)
+        json.dump(ds, j_file, ensure_ascii=False, indent=2)
     return next_img_id, next_id
 
 
