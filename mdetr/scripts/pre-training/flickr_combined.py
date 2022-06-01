@@ -10,6 +10,7 @@ https://github.com/BryanPlummer/flickr30k_entities/blob/68b3d6f12d1d710f96233f6b
 import argparse
 import json
 import os
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -140,6 +141,50 @@ def get_sentence_data(filename) -> List[Dict[str, Any]]:
 
         annotations.append(sentence_data)
 
+    return annotations
+
+
+def get_sentence_data_ja(fn):
+    # exapmle: 5:[/EN#550/clothing 赤い服]を着た4:[/EN#549/people 男]が6:[/EN#551/other 綱]を握って見守っている間に、1:[/EN#547/people 数人のクライマー]が2:[/EN#554/other 列]をなして3:[/EN#548/other 岩]をよじ登っている。
+    tag_pat = re.compile(r'\d+:\[/EN#(?P<id>\d+)(/(?P<type>[a-z]+))+ (?P<words>[^]]+)]')
+    annotations = []
+    for line in Path(fn).read_text().splitlines():
+        chunks = []
+        raw_sentence = ''
+        sidx = 0
+        matches: list[re.Match] = list(re.finditer(tag_pat, line))
+        for match in matches:
+            # chunk 前を追加
+            if sidx < match.start():
+                text = line[sidx:match.start()]
+                raw_sentence += text
+                chunks.append(text)
+            # match の中身を追加
+            raw_sentence += match.group('words')
+            chunks.append({
+                'phrase': match.group('words'),
+                'phrase_id': match.group('id'),
+                'phrase_type': match.group('type'),
+            })
+            sidx = match.end()
+        raw_sentence += line[sidx:]
+        sentence = ''
+        phrases = []
+        char_idx = 0
+        for chunk in chunks:
+            if isinstance(chunk, str):
+                sentence += chunk
+                char_idx += len(chunk)
+            else:
+                chunk['first_char_index'] = char_idx
+                sentence += chunk['phrase']
+                char_idx += len(chunk['phrase'])
+                phrases.append(chunk)
+        assert 'EN' not in sentence
+        annotations.append({
+            'sentence': sentence.strip(' '),
+            'phrases': phrases,
+        })
     return annotations
 
 
@@ -302,7 +347,7 @@ def convert(
 
             target_bboxes = merged_bboxes
 
-        sents = get_sentence_data(flickr_path / "Sentences" / f"{img_id}.txt")
+        sents = get_sentence_data_ja(flickr_path / "Sentences" / f"{img_id}.txt")
         for sent_id, sent in enumerate(sents):
 
             spans = {}  # global phrase ID to span in sentence
