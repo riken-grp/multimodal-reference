@@ -33,7 +33,7 @@ def main():
         image_dir.mkdir(exist_ok=True)
         images = [(path, IMAGE_INTERVAL_MS * i) for i, path in enumerate(sorted(image_dir.glob('*.png')))]
         latest_file = sorted(transcription_dir.joinpath(dialog_id).glob(f'{dialog_id}-*.txt'), key=lambda p: p.name)[-1]
-        transcriptions: list[Transcription] = parse_transcription_file(latest_file)
+        transcriptions: list[Transcription] = sorted(parse_transcription_file(latest_file), key=lambda t: t.start_time)
         infos: list[dict] = []
         knp_string = ''
         sidx = 0
