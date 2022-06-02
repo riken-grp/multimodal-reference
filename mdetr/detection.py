@@ -11,6 +11,8 @@ from PIL import Image
 from matplotlib.patches import Polygon
 from skimage.measure import find_contours
 from transformers import CharSpan
+import portion
+from portion import Interval
 
 from hubconf import _make_detr
 
@@ -139,7 +141,7 @@ def plot_inference(im: Image, caption: str, model: nn.Module):
     # Extract the text spans predicted by each box
     # (140, 2)
     positive_tokens = torch.nonzero(outputs['pred_logits'].cpu()[0, keep].softmax(-1) > 0.1).tolist()
-    predicted_spans: Dict[int, str] = defaultdict(str)
+    predicted_spans: Dict[int, Interval] = defaultdict(lambda: portion.empty())
     for tok in positive_tokens:
         item, pos = tok
         if pos < 255:
@@ -147,9 +149,12 @@ def plot_inference(im: Image, caption: str, model: nn.Module):
                 span: CharSpan = memory_cache['tokenized'].token_to_chars(0, pos)
             except TypeError:
                 continue
-            predicted_spans[item] += ' ' + caption[span.start:span.end]
+            predicted_spans[item] |= portion.closedopen(span.start, span.end)
 
-    labels: List[str] = [predicted_spans[k] for k in sorted(predicted_spans.keys())]
+    labels: List[str] = [
+        ','.join(''.join(caption[j] for j in portion.iterate(i, step=1)) for i in predicted_spans[k])
+        for k in sorted(predicted_spans.keys())
+    ]
     plot_results(im, probs[keep], bboxes_scaled.tolist(), labels)
 
 
