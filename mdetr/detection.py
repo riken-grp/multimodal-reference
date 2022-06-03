@@ -71,7 +71,7 @@ def plot_results(pil_img: Image, scores, boxes: List[List[int]], labels: List[st
     assert len(scores) == len(boxes) == len(labels) == len(masks)
     for score, (xmin, ymin, xmax, ymax), label, mask, color in zip(scores, boxes, labels, masks, colors):
         ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False, color=color, linewidth=3))
-        ax.text(xmin, ymin, f'{label}: {score:0.2f}', fontsize=15, bbox=dict(facecolor='white', alpha=0.8),
+        ax.text(xmin, ymin, f'{label}: {score:0.2f}', fontsize=15, bbox=dict(facecolor=color, alpha=0.8),
                 fontname='Hiragino Maru Gothic Pro')
 
         if mask is None:
@@ -89,6 +89,7 @@ def plot_results(pil_img: Image, scores, boxes: List[List[int]], labels: List[st
 
     plt.imshow(np_image)
     plt.axis('off')
+    plt.savefig('output.png')
     plt.show()
 
 
