@@ -187,7 +187,7 @@ class MDETR(nn.Module):
                     hs = hs[:, :, :-1]
                     out["pred_answer"] = self.answer_head(answer_embeds)
 
-            outputs_class = self.class_embed(hs)
+            outputs_class = self.class_embed(hs)  # token distribution 予測のヘッド
             outputs_coord = self.bbox_embed(hs).sigmoid()
             out.update(
                 {

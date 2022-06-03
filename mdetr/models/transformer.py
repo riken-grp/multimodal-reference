@@ -121,12 +121,12 @@ class Transformer(nn.Module):
                 encoded_text = self.text_encoder(**tokenized)
 
                 # Transpose memory because pytorch's attention expects sequence first
-                text_memory = encoded_text.last_hidden_state.transpose(0, 1)
+                text_memory = encoded_text.last_hidden_state.transpose(0, 1)  # (n, text, thid) -> (text, b, thid)
                 # Invert attention mask that we get from huggingface because its the opposite in pytorch transformer
                 text_attention_mask = tokenized.attention_mask.ne(1).bool()
 
                 # Resize the encoder hidden states to be of the same d_model as the decoder
-                text_memory_resized = self.resizer(text_memory)
+                text_memory_resized = self.resizer(text_memory)  # (text, b, hid)
             else:
                 # The text is already encoded, use as is.
                 text_attention_mask, text_memory_resized, tokenized = text
@@ -138,11 +138,11 @@ class Transformer(nn.Module):
             # Pad the pos_embed with 0 so that the addition will be a no-op for the text tokens
             pos_embed = torch.cat([pos_embed, torch.zeros_like(text_memory_resized)], dim=0)
 
-            img_memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+            img_memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)  # (img+text, b, hid)
 
-            text_memory = img_memory[-len(text_memory_resized) :]
+            text_memory = img_memory[-len(text_memory_resized):]  # (text, b, hid)
 
-            assert img_memory.shape[1] == text_memory.shape[1] == tgt.shape[1]
+            assert img_memory.shape[1] == text_memory.shape[1] == tgt.shape[1], 'batch size not identical'
             memory_cache = {
                 "text_memory_resized": text_memory_resized,
                 "text_memory": text_memory,
