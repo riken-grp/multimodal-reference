@@ -6,8 +6,9 @@ authors = ["nobu-g <ueda-n127@hotmail.co.jp>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
-tqdm = "^4.64.0"
-rhoknp = { git = "https://github.com/ku-nlp/rhoknp.git", branch = "main" }
+tqdm = "^4.64"
+rhoknp = "~1.0.2"
+dataclasses-json = "^0.5.7"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.9"
