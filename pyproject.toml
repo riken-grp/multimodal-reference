@@ -10,7 +10,7 @@ tqdm = "^4.64"
 rhoknp = "~1.0.2"
 dataclasses-json = "^0.5.7"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.9"
 
 [build-system]
