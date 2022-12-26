@@ -10,6 +10,16 @@ tqdm = "^4.64"
 rhoknp = "~1.0.2"
 dataclasses-json = "^0.5.7"
 
+[tool.poetry.group.mdetr.dependencies]
+torch = ">=1.7.0,<1.13.0"
+torchvision = "*"
+matplotlib = "^3.6.2"
+scikit-image = "^0.19.3"
+transformers = "4.6.1"
+tokenizers = ">=0.10.1,<0.11.0"
+portion = "^2.3.0"
+timm = "^0.6.12"
+
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.9"
 
