@@ -100,7 +100,7 @@ def plot_results(image: ImageFile, prediction: Prediction) -> None:
     plt.show()
 
 
-def run_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Prediction:
+def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Prediction:
     # model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True,
     #                                       return_postprocessor=True)
     model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
@@ -183,7 +183,7 @@ def main():
     # image = Image.open(web_image)
     image: ImageFile = Image.open(args.image_path)
 
-    prediction = run_mdetr(args.model, image, Jumanpp().apply_to_document(args.text))
+    prediction = predict_mdetr(args.model, image, Jumanpp().apply_to_document(args.text))
     plot_results(image, prediction)
 
 
