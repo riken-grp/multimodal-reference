@@ -1,5 +1,6 @@
 [flake8]
 exclude =
     .git,
-    __pycache__
+    __pycache__,
+    mdetr
 max-line-length = 120
