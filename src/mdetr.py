@@ -31,7 +31,7 @@ class BoundingBox:
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
-class Prediction:
+class MDETRPrediction:
     bounding_boxes: list[BoundingBox]
     words: list[str]
 
@@ -73,7 +73,7 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def plot_results(image: ImageFile, prediction: Prediction) -> None:
+def plot_results(image: ImageFile, prediction: MDETRPrediction) -> None:
     plt.figure(figsize=(16, 10))
     np_image = np.array(image)
     ax = plt.gca()
@@ -100,7 +100,7 @@ def plot_results(image: ImageFile, prediction: Prediction) -> None:
     plt.show()
 
 
-def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Prediction:
+def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> MDETRPrediction:
     # model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True,
     #                                       return_postprocessor=True)
     model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
@@ -164,7 +164,7 @@ def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Pr
                 word_probs=word_probs,
             )
         )
-    return Prediction(bounding_boxes, [m.text for m in caption.morphemes])
+    return MDETRPrediction(bounding_boxes, [m.text for m in caption.morphemes])
 
 
 def main():
