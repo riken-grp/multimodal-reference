@@ -1,8 +1,8 @@
 # copied from https://github.com/BryanPlummer/flickr30k_entities/blob/master/flickr30k_entities_utils.py
 
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
-import re
 
 
 def get_sentence_data(fn):
@@ -11,7 +11,7 @@ def get_sentence_data(fn):
 
     input:
       fn - full file path to the sentence file to parse
-    
+
     output:
       a list of dictionaries for each sentence with the following fields:
           sentence - the original sentence
@@ -21,7 +21,7 @@ def get_sentence_data(fn):
                       first_word_index - the position of the first word of
                                          the phrase in the sentence
                       phrase_id - an identifier for this phrase
-                      phrase_type - a list of the coarse categories this 
+                      phrase_type - a list of the coarse categories this
                                     phrase belongs to
 
     """
@@ -65,12 +65,7 @@ def get_sentence_data(fn):
         sentence_data = {'sentence': ' '.join(words), 'phrases': []}
         for index, phrase, p_id, p_type in zip(first_word, phrases, phrase_id, phrase_type):
             sentence_data['phrases'].append(
-                {
-                    'first_word_index': index,
-                    'phrase': phrase,
-                    'phrase_id': p_id,
-                    'phrase_type': p_type
-                }
+                {'first_word_index': index, 'phrase': phrase, 'phrase_id': p_id, 'phrase_type': p_type}
             )
 
         annotations.append(sentence_data)
@@ -90,16 +85,18 @@ def get_sentence_data_ja(fn):
         for match in matches:
             # chunk 前を追加
             if sidx < match.start():
-                text = line[sidx:match.start()]
+                text = line[sidx : match.start()]  # noqa
                 raw_sentence += text
                 chunks.append(text)
             # match の中身を追加
             raw_sentence += match.group('words')
-            chunks.append({
-                'phrase': match.group('words'),
-                'phrase_id': match.group('id'),
-                'phrase_type': match.group('type'),
-            })
+            chunks.append(
+                {
+                    'phrase': match.group('words'),
+                    'phrase_id': match.group('id'),
+                    'phrase_type': match.group('type'),
+                }
+            )
             sidx = match.end()
         raw_sentence += line[sidx:]
         sentence = ''
@@ -115,10 +112,12 @@ def get_sentence_data_ja(fn):
                 char_idx += len(chunk['phrase'])
                 phrases.append(chunk)
         assert 'EN' not in sentence
-        annotations.append({
-            'sentence': sentence.strip(' '),
-            'phrases': phrases,
-        })
+        annotations.append(
+            {
+                'sentence': sentence.strip(' '),
+                'phrases': phrases,
+            }
+        )
     return annotations
 
 
@@ -136,7 +135,7 @@ def get_annotations(fn):
           nobox - list of identifiers which were annotated as
                   not being visible in the image
           boxes - a dictionary where the fields are identifiers
-                  and the values are its list of boxes in the 
+                  and the values are its list of boxes in the
                   [xmin ymin xmax ymax] format
     """
     tree = ET.parse(fn)

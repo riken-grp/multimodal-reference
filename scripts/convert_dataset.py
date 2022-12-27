@@ -1,10 +1,9 @@
 import argparse
-from pathlib import Path
 import json
+from pathlib import Path
 
+from flickr30k_entities_utils import get_annotations, get_sentence_data, get_sentence_data_ja
 from tqdm import tqdm
-
-from flickr30k_entities_utils import get_sentence_data, get_sentence_data_ja, get_annotations
 
 
 def convert(sentence_data: dict, annotation_data: dict, image_id: str, sent_id_from: int = 0, ann_id_from: int = 0):

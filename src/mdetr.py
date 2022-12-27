@@ -1,5 +1,5 @@
 import argparse
-import sys;
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,15 +7,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision.transforms as tt
+from dataclasses_json import LetterCase, dataclass_json
 from PIL import Image, ImageFile
-from dataclasses_json import dataclass_json, LetterCase
-from rhoknp import Jumanpp, Document
-from transformers import CharSpan, BatchEncoding
+from rhoknp import Document, Jumanpp
+from transformers import BatchEncoding, CharSpan
 
 from utils import Rectangle
 
 sys.path.append('./mdetr')
-from hubconf import _make_detr
+from hubconf import _make_detr  # noqa: E402
 
 torch.set_grad_enabled(False)
 
@@ -41,8 +41,7 @@ def box_cxcywh_to_xyxy(
     x: torch.Tensor,  # (N, 4)
 ) -> torch.Tensor:
     x_c, y_c, w, h = x.unbind(1)
-    b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
-         (x_c + 0.5 * w), (y_c + 0.5 * h)]
+    b = [(x_c - 0.5 * w), (y_c - 0.5 * h), (x_c + 0.5 * w), (y_c + 0.5 * h)]
     return torch.stack(b, dim=1)
 
 
@@ -58,20 +57,19 @@ def rescale_bboxes(
 
 # colors for visualization
 COLORS = [
-    [0.000, 0.447, 0.741], [0.850, 0.325, 0.098], [0.929, 0.694, 0.125],
-    [0.494, 0.184, 0.556], [0.466, 0.674, 0.188], [0.301, 0.745, 0.933]
+    [0.000, 0.447, 0.741],
+    [0.850, 0.325, 0.098],
+    [0.929, 0.694, 0.125],
+    [0.494, 0.184, 0.556],
+    [0.466, 0.674, 0.188],
+    [0.301, 0.745, 0.933],
 ]
 
 
 def apply_mask(image, mask, color, alpha=0.5):
     """Apply the given mask to the image."""
     for c in range(3):
-        image[:, :, c] = np.where(
-            mask == 1,
-            image[:, :, c] *
-            (1 - alpha) + alpha * color[c] * 255,
-            image[:, :, c]
-        )
+        image[:, :, c] = np.where(mask == 1, image[:, :, c] * (1 - alpha) + alpha * color[c] * 255, image[:, :, c])
     return image
 
 
@@ -115,11 +113,7 @@ def run_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Predic
     assert caption.need_jumanpp is False
 
     # standard PyTorch mean-std input image normalization
-    transform = tt.Compose([
-        tt.Resize(800),
-        tt.ToTensor(),
-        tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
+    transform = tt.Compose([tt.Resize(800), tt.ToTensor(), tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
     # mean-std normalize the input image (batch-size: 1)
     img: torch.Tensor = transform(im).unsqueeze(0)  # (1, ch, H, W)
@@ -142,7 +136,7 @@ def run_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Predic
     # keep only predictions with 0.8+ confidence
     # -1: no text
     probs: torch.Tensor = 1 - pred_logits.softmax(dim=2)[0, :, -1]  # (cand)
-    keep: torch.Tensor = (probs > 0.8)  # (cand)
+    keep: torch.Tensor = probs > 0.8  # (cand)
 
     # convert boxes from [0; 1] to image scales
     bboxes_scaled = rescale_bboxes(pred_boxes[0, keep], im.size)  # (kept, 4)
@@ -155,12 +149,12 @@ def run_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Predic
                 span: CharSpan = tokenized.token_to_chars(0, pos)
             except TypeError:
                 continue
-            char_probs[span.start:span.end] = [token_prob] * (span.end - span.start)
+            char_probs[span.start : span.end] = [token_prob] * (span.end - span.start)
         word_probs: list[float] = []
         char_span = CharSpan(0, 0)
         for morpheme in caption.morphemes:
             char_span = CharSpan(char_span.end, char_span.end + len(morpheme.text))
-            word_probs.append(np.max(char_probs[char_span.start:char_span.end]).item())
+            word_probs.append(np.max(char_probs[char_span.start : char_span.end]).item())
 
         bounding_boxes.append(
             BoundingBox(
@@ -178,8 +172,9 @@ def main():
     parser.add_argument('--model', '-m', type=str, help='Path to trained model.')
     # parser.add_argument('--image-dir', '--img', type=str, help='Path to the directory containing images.')
     parser.add_argument('--image-path', '--img', type=str, help='Path to the images file.')
-    parser.add_argument('--text', type=str, default='5 people each holding an umbrella',
-                        help='split text to perform grounding.')
+    parser.add_argument(
+        '--text', type=str, default='5 people each holding an umbrella', help='split text to perform grounding.'
+    )
     # parser.add_argument('--dialog-ids', '--id', type=str, help='Path to the file containing dialog ids.')
     args = parser.parse_args()
 

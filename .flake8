@@ -1,6 +1,4 @@
 [flake8]
-exclude =
-    .git,
-    __pycache__,
-    mdetr
-max-line-length = 120
+per-file-ignores =
+    *:E501
+    E203
