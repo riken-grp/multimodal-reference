@@ -1,41 +1,55 @@
 import argparse
-from collections import defaultdict
-from typing import Dict, List
+import sys;
+from dataclasses import dataclass
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
 import torchvision.transforms as tt
-from PIL import Image
-from matplotlib.patches import Polygon
-from skimage.measure import find_contours
-from transformers import CharSpan
-import portion
-from portion import Interval
+from PIL import Image, ImageFile
+from dataclasses_json import dataclass_json, LetterCase
+from rhoknp import Jumanpp, Document
+from transformers import CharSpan, BatchEncoding
 
-import sys; sys.path.append('./mdetr')
+from utils import Rectangle
+
+sys.path.append('./mdetr')
 from hubconf import _make_detr
 
 torch.set_grad_enabled(False)
 
-# standard PyTorch mean-std input image normalization
-transform = tt.Compose([
-    tt.Resize(800),
-    tt.ToTensor(),
-    tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class BoundingBox:
+    rect: Rectangle
+    class_name: str
+    confidence: float
+    word_probs: list[float]
+
+
+@dataclass_json(letter_case=LetterCase.CAMEL)
+@dataclass(frozen=True)
+class Prediction:
+    bounding_boxes: list[BoundingBox]
+    words: list[str]
 
 
 # for output bounding box post-processing
-def box_cxcywh_to_xyxy(x: torch.Tensor) -> torch.Tensor:
+def box_cxcywh_to_xyxy(
+    x: torch.Tensor,  # (N, 4)
+) -> torch.Tensor:
     x_c, y_c, w, h = x.unbind(1)
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
     return torch.stack(b, dim=1)
 
 
-def rescale_bboxes(out_bbox: torch.Tensor, size) -> torch.Tensor:
+def rescale_bboxes(
+    out_bbox: torch.Tensor,  # (N, 4)
+    size: tuple[int, int],
+) -> torch.Tensor:  # (N, 4)
     img_w, img_h = size
     b = box_cxcywh_to_xyxy(out_bbox)
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
@@ -50,8 +64,7 @@ COLORS = [
 
 
 def apply_mask(image, mask, color, alpha=0.5):
-    """Apply the given mask to the image.
-    """
+    """Apply the given mask to the image."""
     for c in range(3):
         image[:, :, c] = np.where(
             mask == 1,
@@ -62,31 +75,26 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def plot_results(pil_img: Image, scores: List[float], boxes: List[List[int]], labels: List[str], masks=None):
+def plot_results(image: ImageFile, prediction: Prediction) -> None:
     plt.figure(figsize=(16, 10))
-    np_image = np.array(pil_img)
+    np_image = np.array(image)
     ax = plt.gca()
     colors = COLORS * 100
-    if masks is None:
-        masks = [None] * len(scores)
-    assert len(scores) == len(boxes) == len(labels) == len(masks)
-    for score, (xmin, ymin, xmax, ymax), label, mask, color in zip(scores, boxes, labels, masks, colors):
-        ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False, color=color, linewidth=3))
-        ax.text(xmin, ymin, f'{label}: {score:0.2f}', fontsize=15, bbox=dict(facecolor=color, alpha=0.8),
-                fontname='Hiragino Maru Gothic Pro')
 
-        if mask is None:
-            continue
-        np_image = apply_mask(np_image, mask, color)
-
-        padded_mask = np.zeros((mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
-        padded_mask[1:-1, 1:-1] = mask
-        contours = find_contours(padded_mask, 0.5)
-        for verts in contours:
-            # Subtract the padding and flip (y, x) to (x, y)
-            verts = np.fliplr(verts) - 1
-            p = Polygon(verts, facecolor='none', edgecolor=color)
-            ax.add_patch(p)
+    for bounding_box in prediction.bounding_boxes:
+        rect = bounding_box.rect
+        score = bounding_box.confidence
+        label = ",".join(word for word, prob in zip(prediction.words, bounding_box.word_probs) if prob >= 0.1)
+        color = colors.pop()
+        ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=color, linewidth=3))
+        ax.text(
+            rect.x1,
+            rect.y1,
+            f'{label}: {score:0.2f}',
+            fontsize=15,
+            bbox=dict(facecolor=color, alpha=0.8),
+            fontname='Hiragino Maru Gothic Pro',
+        )
 
     plt.imshow(np_image)
     plt.axis('off')
@@ -94,70 +102,75 @@ def plot_results(pil_img: Image, scores: List[float], boxes: List[List[int]], la
     plt.show()
 
 
-# def add_res(results, ax):
-#     # for tt in results.values():
-#     if True:
-#         bboxes = results['boxes']
-#         labels = results['labels']
-#         scores = results['scores']
-#         # keep = scores >= 0.0
-#         # bboxes = bboxes[keep].tolist()
-#         # labels = labels[keep].tolist()
-#         # scores = scores[keep].tolist()
-#     # print(torchvision.ops.box_iou(tt['boxes'].cpu().detach(), torch.as_tensor([[xmin, ymin, xmax, ymax]])))
-#
-#     colors = ['purple', 'yellow', 'red', 'green', 'orange', 'pink']
-#
-#     for i, (b, ll, ss) in enumerate(zip(bboxes, labels, scores)):
-#         ax.add_patch(plt.Rectangle((b[0], b[1]), b[2] - b[0], b[3] - b[1], fill=False, color=colors[i], linewidth=3))
-#         cls_name = ll if isinstance(ll, str) else CLASSES[ll]
-#         text = f'{cls_name}: {ss:.2f}'
-#         print(text)
-#         ax.text(b[0], b[1], text, fontsize=15, bbox=dict(facecolor='white', alpha=0.8))
-
-
-def plot_inference(im: Image, caption: str, model: nn.Module):
-    # mean-std normalize the input image (batch-size: 1)
+def run_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> Prediction:
+    # model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True,
+    #                                       return_postprocessor=True)
+    model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
+    checkpoint = torch.load(str(checkpoint_path), map_location='cpu')
+    model.load_state_dict(checkpoint['model'])
     if torch.cuda.is_available():
-        img: torch.Tensor = transform(im).unsqueeze(0).cuda()  # (1, ch, H, W)
-    else:
-        img: torch.Tensor = transform(im).unsqueeze(0)
+        model = model.cuda()
+    model.eval()
+
+    assert caption.need_jumanpp is False
+
+    # standard PyTorch mean-std input image normalization
+    transform = tt.Compose([
+        tt.Resize(800),
+        tt.ToTensor(),
+        tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+
+    # mean-std normalize the input image (batch-size: 1)
+    img: torch.Tensor = transform(im).unsqueeze(0)  # (1, ch, H, W)
+    if torch.cuda.is_available():
+        img = img.cuda()
 
     # propagate through the model
-    memory_cache = model(img, [caption], encode_and_save=True)
+    memory_cache = model(img, [caption.text], encode_and_save=True)
     # dict keys: 'pred_logits', 'pred_boxes', 'proj_queries', 'proj_tokens', 'tokenized'
     # pred_logits: (1, cand, seq)
     # pred_boxes: (1, cand, 4)
     # proj_queries: (1, cand, 64)
     # proj_tokens: (1, 28, 64)
     # tokenized: BatchEncoding
-    outputs: dict = model(img, [caption], encode_and_save=False, memory_cache=memory_cache)
+    outputs: dict = model(img, [caption.text], encode_and_save=False, memory_cache=memory_cache)
+    pred_logits: torch.Tensor = outputs['pred_logits'].cpu()  # (b, cand, seq)
+    pred_boxes: torch.Tensor = outputs['pred_boxes'].cpu()  # (b, cand, 4)
+    tokenized: BatchEncoding = memory_cache['tokenized']
 
-    # keep only predictions with 0.7+ confidence
-    probs = 1 - outputs['pred_logits'].softmax(dim=2)[0, :, -1].cpu()  # (cand)
-    keep = (probs > 0.8)  # (cand)
+    # keep only predictions with 0.8+ confidence
+    # -1: no text
+    probs: torch.Tensor = 1 - pred_logits.softmax(dim=2)[0, :, -1]  # (cand)
+    keep: torch.Tensor = (probs > 0.8)  # (cand)
 
     # convert boxes from [0; 1] to image scales
-    bboxes_scaled = rescale_bboxes(outputs['pred_boxes'].cpu()[0, keep], im.size)  # (kept, 4)
+    bboxes_scaled = rescale_bboxes(pred_boxes[0, keep], im.size)  # (kept, 4)
 
-    # Extract the text spans predicted by each box
-    # (140, 2)
-    positive_tokens = torch.nonzero(outputs['pred_logits'].cpu()[0, keep].softmax(-1) > 0.1).tolist()
-    predicted_spans: Dict[int, Interval] = defaultdict(lambda: portion.empty())
-    for tok in positive_tokens:
-        item, pos = tok
-        if pos < 255:
+    bounding_boxes = []
+    for prob, bbox, token_probs in zip(probs[keep], bboxes_scaled.tolist(), pred_logits[0, keep].softmax(dim=-1)):
+        char_probs: list[float] = [0] * len(caption.text)
+        for pos, token_prob in enumerate(token_probs.tolist()):
             try:
-                span: CharSpan = memory_cache['tokenized'].token_to_chars(0, pos)
+                span: CharSpan = tokenized.token_to_chars(0, pos)
             except TypeError:
                 continue
-            predicted_spans[item] |= portion.closedopen(span.start, span.end)
+            char_probs[span.start:span.end] = [token_prob] * (span.end - span.start)
+        word_probs: list[float] = []
+        char_span = CharSpan(0, 0)
+        for morpheme in caption.morphemes:
+            char_span = CharSpan(char_span.end, char_span.end + len(morpheme.text))
+            word_probs.append(np.max(char_probs[char_span.start:char_span.end]).item())
 
-    labels: List[str] = [
-        ','.join(''.join(caption[j] for j in portion.iterate(i, step=1)) for i in predicted_spans[k])
-        for k in sorted(predicted_spans.keys())
-    ]
-    plot_results(im, probs[keep], bboxes_scaled.tolist(), labels)
+        bounding_boxes.append(
+            BoundingBox(
+                rect=Rectangle.from_xyxy(*bbox),
+                class_name="",
+                confidence=prob,
+                word_probs=word_probs,
+            )
+        )
+    return Prediction(bounding_boxes, [m.text for m in caption.morphemes])
 
 
 def main():
@@ -170,20 +183,13 @@ def main():
     # parser.add_argument('--dialog-ids', '--id', type=str, help='Path to the file containing dialog ids.')
     args = parser.parse_args()
 
-    # model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True,
-    #                                       return_postprocessor=True)
-    model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
-    checkpoint = torch.load(args.model, map_location='cpu')
-    model.load_state_dict(checkpoint['model'])
-    if torch.cuda.is_available():
-        model = model.cuda()
-    model.eval()
-
     # url = "http://images.cocodataset.org/val2017/000000281759.jpg"
     # web_image = requests.get(url, stream=True).raw
-    # im = Image.open(web_image)
-    image = Image.open(args.image_path)
-    plot_inference(image, args.text, model)
+    # image = Image.open(web_image)
+    image: ImageFile = Image.open(args.image_path)
+
+    prediction = run_mdetr(args.model, image, Jumanpp().apply_to_document(args.text))
+    plot_results(image, prediction)
 
 
 if __name__ == '__main__':
