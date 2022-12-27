@@ -6,7 +6,6 @@ This file provides the definition of the convolutional heads used to predict mas
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from models.backbone import TimmBackbone
 from util.misc import NestedTensor
 

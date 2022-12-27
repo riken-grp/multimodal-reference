@@ -156,16 +156,18 @@ def get_sentence_data_ja(fn):
         for match in matches:
             # chunk 前を追加
             if sidx < match.start():
-                text = line[sidx:match.start()]
+                text = line[sidx : match.start()]
                 raw_sentence += text
                 chunks.append(text)
             # match の中身を追加
             raw_sentence += match.group('words')
-            chunks.append({
-                'phrase': match.group('words'),
-                'phrase_id': match.group('id'),
-                'phrase_type': match.group('type'),
-            })
+            chunks.append(
+                {
+                    'phrase': match.group('words'),
+                    'phrase_id': match.group('id'),
+                    'phrase_type': match.group('type'),
+                }
+            )
             sidx = match.end()
         raw_sentence += line[sidx:]
         sentence = ''
@@ -181,10 +183,12 @@ def get_sentence_data_ja(fn):
                 char_idx += len(chunk['phrase'])
                 phrases.append(chunk)
         assert 'EN' not in sentence
-        annotations.append({
-            'sentence': sentence.strip(' '),
-            'phrases': phrases,
-        })
+        annotations.append(
+            {
+                'sentence': sentence.strip(' '),
+                'phrases': phrases,
+            }
+        )
     return annotations
 
 
@@ -362,7 +366,7 @@ def convert(
                 first_char_index = phrase["first_char_index"]
                 begin, end = first_char_index, first_char_index + len(phrase["phrase"])
                 spans[global_phrase_id] = (begin, end)
-                assert sentence[begin : end] == phrase["phrase"]
+                assert sentence[begin:end] == phrase["phrase"]
 
             all_boxes_in_sent = []
             for ent_id in entity_ids:

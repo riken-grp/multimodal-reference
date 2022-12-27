@@ -1,25 +1,25 @@
 # Referring Expression Comprehension
 
-### RefCOCO 
+### RefCOCO
 
 | Backbone | Pre-training Image Data | Val | TestA  | TestB | url | size |
 |----------|---------|---------|-----------|----------|-----------|-----------|
-| Resnet-101| COCO+VG+Flickr | 86.75   |  89.58   |   81.41  | [model](https://zenodo.org/record/4721981/files/refcoco_resnet101_checkpoint.pth?download=1)   |  3GB   |   
-| EfficientNet-B3| COCO+VG+Flickr |  87.51  | 90.40  | 82.67 | [model](https://zenodo.org/record/4721981/files/refcoco_EB3_checkpoint.pth?download=1)  |  2.4GB   | 
+| Resnet-101| COCO+VG+Flickr | 86.75   |  89.58   |   81.41  | [model](https://zenodo.org/record/4721981/files/refcoco_resnet101_checkpoint.pth?download=1)   |  3GB   |
+| EfficientNet-B3| COCO+VG+Flickr |  87.51  | 90.40  | 82.67 | [model](https://zenodo.org/record/4721981/files/refcoco_EB3_checkpoint.pth?download=1)  |  2.4GB   |
 
 ### RefCOCO+
 
 | Backbone | Pre-training Image Data | Val | TestA  | TestB | url | size |
 |----------|---------|---------|-----------|----------|-----------|-----------|
-| Resnet-101| COCO+VG+Flickr | 79.52   |  84.09  |   70.62  | [model](https://zenodo.org/record/4721981/files/refcoco%2B_resnet101_checkpoint.pth?download=1)   |  3GB  |   
-| EfficientNet-B3| COCO+VG+Flickr |  81.13  | 85.52  | 72.96 | [model](https://zenodo.org/record/4721981/files/refcoco%2B_EB3_checkpoint.pth?download=1)   | 2.4GB   | 
+| Resnet-101| COCO+VG+Flickr | 79.52   |  84.09  |   70.62  | [model](https://zenodo.org/record/4721981/files/refcoco%2B_resnet101_checkpoint.pth?download=1)   |  3GB  |
+| EfficientNet-B3| COCO+VG+Flickr |  81.13  | 85.52  | 72.96 | [model](https://zenodo.org/record/4721981/files/refcoco%2B_EB3_checkpoint.pth?download=1)   | 2.4GB   |
 
 ### RefCOCOg
 
 | Backbone | Pre-training Image Data | Val | Test  |  url | size |
 |----------|---------|---------|-----------|----------|-----------|
-| Resnet-101| COCO+VG+Flickr | 81.64 | 80.89    | [model](https://zenodo.org/record/4721981/files/refcocog_resnet101_checkpoint.pth?download=1)   |   3GB  |   
-| EfficientNet-B3| COCO+VG+Flickr |  83.35  | 83.31  | [model](https://zenodo.org/record/4721981/files/refcocog_EB3_checkpoint.pth?download=1)  | 2.4GB   | 
+| Resnet-101| COCO+VG+Flickr | 81.64 | 80.89    | [model](https://zenodo.org/record/4721981/files/refcocog_resnet101_checkpoint.pth?download=1)   |   3GB  |
+| EfficientNet-B3| COCO+VG+Flickr |  83.35  | 83.31  | [model](https://zenodo.org/record/4721981/files/refcocog_EB3_checkpoint.pth?download=1)  | 2.4GB   |
 
 
 
@@ -42,7 +42,7 @@ Download our [pre-processed annotations](https://zenodo.org/record/4729015/files
 
 ### Script to reproduce results
 
-Model weights (can also be loaded directly from url): 
+Model weights (can also be loaded directly from url):
 1. [refcoco_resnet101_checkpoint.pth](https://zenodo.org/record/4721981/files/refcoco_resnet101_checkpoint.pth?download=1)
 2. [refcoco_EB3_checkpoint.pth](https://zenodo.org/record/4721981/files/refcoco_EB3_checkpoint.pth?download=1)
 3. [refcoco+_resnet101_checkpoint.pth](https://zenodo.org/record/4721981/files/refcoco%2B_resnet101_checkpoint.pth?download=1)

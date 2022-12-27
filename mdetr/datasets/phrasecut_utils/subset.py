@@ -7,7 +7,7 @@ Changelog:
 - Make it a class and properly handle paths
 """
 """
-Split the dataset into subsets for detailed diagnose. 
+Split the dataset into subsets for detailed diagnose.
 Supported subsets:
 
 'all': All the data

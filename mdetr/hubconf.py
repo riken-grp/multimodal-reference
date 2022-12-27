@@ -1,6 +1,5 @@
 # Copyright (c) Aishwarya Kamath & Nicolas Carion. Licensed under the Apache License 2.0. All Rights Reserved
 import torch
-
 from models.backbone import Backbone, Joiner, TimmBackbone
 from models.mdetr import MDETR
 from models.position_encoding import PositionEmbeddingSine

@@ -7,9 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from prettytable import PrettyTable
-
 import util.dist as dist
+from prettytable import PrettyTable
 
 #### The following loading utilities are imported from
 #### https://github.com/BryanPlummer/flickr30k_entities/blob/68b3d6f12d1d710f96233f6bd2b6de799d6f4e5b/flickr30k_entities_utils.py
@@ -98,16 +97,18 @@ def get_sentence_data_ja(fn):
         for match in matches:
             # chunk 前を追加
             if sidx < match.start():
-                text = line[sidx:match.start()]
+                text = line[sidx : match.start()]
                 raw_sentence += text
                 chunks.append(text)
             # match の中身を追加
             raw_sentence += match.group('words')
-            chunks.append({
-                'phrase': match.group('words'),
-                'phrase_id': match.group('id'),
-                'phrase_type': match.group('type'),
-            })
+            chunks.append(
+                {
+                    'phrase': match.group('words'),
+                    'phrase_id': match.group('id'),
+                    'phrase_type': match.group('type'),
+                }
+            )
             sidx = match.end()
         raw_sentence += line[sidx:]
         sentence = ''
@@ -123,10 +124,12 @@ def get_sentence_data_ja(fn):
                 char_idx += len(chunk['phrase'])
                 phrases.append(chunk)
         assert 'EN' not in sentence
-        annotations.append({
-            'sentence': sentence.strip(' '),
-            'phrases': phrases,
-        })
+        annotations.append(
+            {
+                'sentence': sentence.strip(' '),
+                'phrases': phrases,
+            }
+        )
     return annotations
 
 
@@ -263,7 +266,7 @@ def _merge_boxes(boxes: List[List[int]]) -> List[List[int]]:
 
 
 class RecallTracker:
-    """ Utility class to track recall@k for various k, split by categories"""
+    """Utility class to track recall@k for various k, split by categories"""
 
     def __init__(self, topk: Sequence[int]):
         """

@@ -13,6 +13,7 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
+        exclude: mdetr/
   - repo: https://github.com/PyCQA/isort
     rev: 5.11.4
     hooks:

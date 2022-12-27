@@ -3,7 +3,6 @@
 import torch.utils.data
 import torchvision
 
-from .mixed import CustomCocoDetection
 from .clevr import build as build_clevr
 from .clevrref import build as build_clevrref
 from .coco import build as build_coco
@@ -12,6 +11,7 @@ from .gqa import build as build_gqa
 from .lvis import LvisDetectionBase
 from .lvis import build as build_lvis
 from .lvis_modulation import build as build_modulated_lvis
+from .mixed import CustomCocoDetection
 from .mixed import build as build_mixed
 from .phrasecut import build as build_phrasecut
 from .refexp import build as build_refexp

@@ -10,7 +10,6 @@ import numpy as np
 import pycocotools.mask as mask_util
 import torch
 import torch._six
-
 import util.dist as dist
 
 from .coco_eval import merge
@@ -35,10 +34,10 @@ class Params:
         self.rec_thrs = np.linspace(0.0, 1.00, int(np.round((1.00 - 0.0) / 0.01)) + 1, endpoint=True)
         self.max_dets = 300
         self.area_rng = [
-            [0 ** 2, 1e5 ** 2],
-            [0 ** 2, 32 ** 2],
-            [32 ** 2, 96 ** 2],
-            [96 ** 2, 1e5 ** 2],
+            [0**2, 1e5**2],
+            [0**2, 32**2],
+            [32**2, 96**2],
+            [96**2, 1e5**2],
         ]
         self.area_rng_lbl = ["all", "small", "medium", "large"]
         self.use_cats = 1

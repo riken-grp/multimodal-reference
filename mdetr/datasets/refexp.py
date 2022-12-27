@@ -5,9 +5,8 @@ from pathlib import Path
 
 import torch
 import torch.utils.data
-from transformers import AutoTokenizer
-
 import util.dist as dist
+from transformers import AutoTokenizer
 from util.box_ops import generalized_box_iou
 
 from .coco import ModulatedDetection, make_coco_transforms

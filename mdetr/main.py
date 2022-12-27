@@ -14,8 +14,6 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.utils
-from torch.utils.data import ConcatDataset, DataLoader, DistributedSampler
-
 import util.dist as dist
 import util.misc as utils
 from datasets import build_dataset, get_coco_api_from_dataset
@@ -27,6 +25,7 @@ from datasets.refexp import RefExpEvaluator
 from engine import evaluate, train_one_epoch
 from models import build_model
 from models.postprocessors import build_postprocessors
+from torch.utils.data import ConcatDataset, DataLoader, DistributedSampler
 
 
 def get_args_parser():

@@ -2,8 +2,8 @@
 
 | Backbone | M-IoU | Precision @0.5 | Precision @0.7 | Precision @0.9  |  url | size |
 |----------|---------|---------|-----------|----------|-----------|-----------|
-| Resnet-101| 53.1 | 56.1 | 38.9    | 11.9   | [model](https://zenodo.org/record/4721981/files/phrasecut_resnet101_checkpoint.pth?download=1)   |  1.5GB    |   
-| EfficientNet-B3| 53.7| 57.5|  39.9  | 11.9 | [model](https://zenodo.org/record/4721981/files/phrasecut_EB3_checkpoint.pth?download=1)   | 1.2GB  | 
+| Resnet-101| 53.1 | 56.1 | 38.9    | 11.9   | [model](https://zenodo.org/record/4721981/files/phrasecut_resnet101_checkpoint.pth?download=1)   |  1.5GB    |
+| EfficientNet-B3| 53.7| 57.5|  39.9  | 11.9 | [model](https://zenodo.org/record/4721981/files/phrasecut_EB3_checkpoint.pth?download=1)   | 1.2GB  |
 
 
 In this section, we showcase that MDETR can be extended to perform segmentation.

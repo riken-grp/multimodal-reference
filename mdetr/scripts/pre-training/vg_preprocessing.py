@@ -4,18 +4,20 @@ import json
 import math
 import os
 import pickle
+import sys
 from collections import Counter, defaultdict
 from copy import deepcopy
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Dict, List, Tuple
-import sys
+
 PACKAGE_PARENT = ".."
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 import torch
 from tqdm import tqdm
+
 from utils.boxes import box_iou_helper, combine_boxes, get_boxes_equiv, obj_to_box, region_to_box, xyxy_to_xywh
 from utils.dump import Annotation, Datapoint
 from utils.spans import (

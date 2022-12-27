@@ -13,8 +13,9 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .lvis_coco_format import get_subset
 from tqdm import tqdm
+
+from .lvis_coco_format import get_subset
 
 
 def parse_args():

@@ -8,14 +8,16 @@ import argparse
 import json
 import os
 import pickle
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import List
-import sys
+
 PACKAGE_PARENT = ".."
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 from tqdm import tqdm
+
 from utils.dump import Annotation, Datapoint
 from utils.spans import consolidate_spans
 from utils.text import get_root_and_nouns
@@ -25,7 +27,9 @@ def parse_args():
     parser = argparse.ArgumentParser("Conversion script")
 
     parser.add_argument(
-        "--refexp_ann_path", type=str, required=True,
+        "--refexp_ann_path",
+        type=str,
+        required=True,
     )
     parser.add_argument(
         "--out_path",
@@ -48,9 +52,7 @@ def convert(dataset_path: Path, split, output_path, coco_path):
     all_datapoints: List[Datapoint] = []
 
     safe_ids = set()
-    with open(
-        "combined_ref_exp_safe_train_ids.txt", "r"
-    ) as f:
+    with open("combined_ref_exp_safe_train_ids.txt", "r") as f:
         for line in f:
             safe_ids.add(int(line.strip()))
 

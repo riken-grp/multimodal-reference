@@ -4,33 +4,27 @@ from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
+import portion
 import torch
 import torch.nn as nn
 import torchvision.transforms as tt
-from PIL import Image
+from hubconf import _make_detr
 from matplotlib.patches import Polygon
+from PIL import Image
+from portion import Interval
 from skimage.measure import find_contours
 from transformers import CharSpan
-import portion
-from portion import Interval
-
-from hubconf import _make_detr
 
 torch.set_grad_enabled(False)
 
 # standard PyTorch mean-std input image normalization
-transform = tt.Compose([
-    tt.Resize(800),
-    tt.ToTensor(),
-    tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
+transform = tt.Compose([tt.Resize(800), tt.ToTensor(), tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 
 # for output bounding box post-processing
 def box_cxcywh_to_xyxy(x: torch.Tensor) -> torch.Tensor:
     x_c, y_c, w, h = x.unbind(1)
-    b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
-         (x_c + 0.5 * w), (y_c + 0.5 * h)]
+    b = [(x_c - 0.5 * w), (y_c - 0.5 * h), (x_c + 0.5 * w), (y_c + 0.5 * h)]
     return torch.stack(b, dim=1)
 
 
@@ -43,21 +37,19 @@ def rescale_bboxes(out_bbox: torch.Tensor, size) -> torch.Tensor:
 
 # colors for visualization
 COLORS = [
-    [0.000, 0.447, 0.741], [0.850, 0.325, 0.098], [0.929, 0.694, 0.125],
-    [0.494, 0.184, 0.556], [0.466, 0.674, 0.188], [0.301, 0.745, 0.933]
+    [0.000, 0.447, 0.741],
+    [0.850, 0.325, 0.098],
+    [0.929, 0.694, 0.125],
+    [0.494, 0.184, 0.556],
+    [0.466, 0.674, 0.188],
+    [0.301, 0.745, 0.933],
 ]
 
 
 def apply_mask(image, mask, color, alpha=0.5):
-    """Apply the given mask to the image.
-    """
+    """Apply the given mask to the image."""
     for c in range(3):
-        image[:, :, c] = np.where(
-            mask == 1,
-            image[:, :, c] *
-            (1 - alpha) + alpha * color[c] * 255,
-            image[:, :, c]
-        )
+        image[:, :, c] = np.where(mask == 1, image[:, :, c] * (1 - alpha) + alpha * color[c] * 255, image[:, :, c])
     return image
 
 
@@ -71,8 +63,14 @@ def plot_results(pil_img: Image, scores, boxes: List[List[int]], labels: List[st
     assert len(scores) == len(boxes) == len(labels) == len(masks)
     for score, (xmin, ymin, xmax, ymax), label, mask, color in zip(scores, boxes, labels, masks, colors):
         ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, fill=False, color=color, linewidth=3))
-        ax.text(xmin, ymin, f'{label}: {score:0.2f}', fontsize=15, bbox=dict(facecolor=color, alpha=0.8),
-                fontname='Hiragino Maru Gothic Pro')
+        ax.text(
+            xmin,
+            ymin,
+            f'{label}: {score:0.2f}',
+            fontsize=15,
+            bbox=dict(facecolor=color, alpha=0.8),
+            fontname='Hiragino Maru Gothic Pro',
+        )
 
         if mask is None:
             continue
@@ -134,7 +132,7 @@ def plot_inference(im: Image, caption: str, model: nn.Module):
 
     # keep only predictions with 0.7+ confidence
     probs = 1 - outputs['pred_logits'].softmax(dim=2)[0, :, -1].cpu()  # (cand)
-    keep = (probs > 0.8)  # (cand)
+    keep = probs > 0.8  # (cand)
 
     # convert boxes from [0; 1] to image scales
     bboxes_scaled = rescale_bboxes(outputs['pred_boxes'].cpu()[0, keep], im.size)  # (kept, 4)
@@ -164,8 +162,9 @@ def main():
     parser.add_argument('--model', '-m', type=str, help='Path to trained model.')
     # parser.add_argument('--image-dir', '--img', type=str, help='Path to the directory containing images.')
     parser.add_argument('--image-path', '--img', type=str, help='Path to the images file.')
-    parser.add_argument('--text', type=str, default='5 people each holding an umbrella',
-                        help='split text to perform grounding.')
+    parser.add_argument(
+        '--text', type=str, default='5 people each holding an umbrella', help='split text to perform grounding.'
+    )
     # parser.add_argument('--dialog-ids', '--id', type=str, help='Path to the file containing dialog ids.')
     args = parser.parse_args()
 

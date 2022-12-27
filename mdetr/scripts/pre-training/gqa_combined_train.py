@@ -11,14 +11,16 @@ import json
 import os
 import pickle
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import List
-import sys
+
 PACKAGE_PARENT = ".."
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 from tqdm import tqdm
+
 from utils.dump import Annotation, Datapoint
 from utils.spans import consolidate_spans
 
@@ -45,12 +47,7 @@ def parse_args():
         help="Path to the gqa dataset scene graph",
     )
 
-    parser.add_argument(
-        "--vg_img_data_path",
-        required=True,
-        type=str,
-        help="Path to image meta data for VG"
-    )
+    parser.add_argument("--vg_img_data_path", required=True, type=str, help="Path to image meta data for VG")
 
     parser.add_argument(
         "--out_path",

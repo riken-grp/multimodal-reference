@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import pickle
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -16,7 +17,7 @@ from typing import Dict, List, Tuple
 import torch
 from torchvision.ops.boxes import box_iou
 from tqdm import tqdm
-import sys
+
 PACKAGE_PARENT = ".."
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
@@ -26,9 +27,7 @@ from utils.spans import consolidate_spans, shift_spans
 
 def parse_args():
     parser = argparse.ArgumentParser("Conversion script")
-    parser.add_argument(
-        "--all_data_path", type=str, default=""
-    )
+    parser.add_argument("--all_data_path", type=str, default="")
     parser.add_argument(
         "--combine_datasets", "--list", nargs="+", help="List of datasets to combine", default=["refexp", "gqa", "vg"]
     )
@@ -47,12 +46,7 @@ def parse_args():
         help="Path to coco 2014 dataset.",
     )
 
-    parser.add_argument(
-        "--vg_img_data_path",
-        required=True,
-        type=str,
-        help="Path to image meta data for VG"
-    )
+    parser.add_argument("--vg_img_data_path", required=True, type=str, help="Path to image meta data for VG")
     return parser.parse_args()
 
 
@@ -101,7 +95,10 @@ def rescale_boxes(old_datapoint: Datapoint, old_size: Tuple[int, int], new_size:
 
 
 def combine_dataset_datapoints(
-    dataset_dicts: Dict[str, List[Datapoint]], vg_imid2data: Dict[int, Dict], coco_imid2data: Dict[str, Dict], coco_path: str,
+    dataset_dicts: Dict[str, List[Datapoint]],
+    vg_imid2data: Dict[int, Dict],
+    coco_imid2data: Dict[str, Dict],
+    coco_path: str,
 ) -> Tuple[Dict[str, List[Datapoint]], Dict[str, List[Datapoint]]]:
     """This functions accepts a dict from the 'dataset_name' to the list of datapoints we have for this dataset.
     It splits the data points based on whether we have a coco id or a vg id for the images.
@@ -339,7 +336,9 @@ def main(args):
         coco_image_data = json.load(f)
     imid2data_coco = {str(x["id"]): x for x in coco_image_data["images"]}
 
-    combined_dict_coco, combined_dict_vg = combine_dataset_datapoints(dset_dicts, vg_imid2data, imid2data_coco, coco_path=args.coco_path)
+    combined_dict_coco, combined_dict_vg = combine_dataset_datapoints(
+        dset_dicts, vg_imid2data, imid2data_coco, coco_path=args.coco_path
+    )
     datapoint_list_coco = get_refexp_groups(combined_dict_coco)
     datapoint_list_vg = get_refexp_groups(combined_dict_vg)
 

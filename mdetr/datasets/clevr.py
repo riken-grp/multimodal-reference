@@ -10,14 +10,13 @@ import os
 import pickle
 from pathlib import Path
 
+import datasets.transforms as T
 import numpy as np
 import torch
 import torch.utils.data
 import torchvision
 from PIL import Image
 from transformers import AutoTokenizer
-
-import datasets.transforms as T
 
 from .coco import ConvertCocoPolysToMask, create_positive_map
 

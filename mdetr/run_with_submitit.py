@@ -13,10 +13,10 @@ from pathlib import Path
 from typing import Dict
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+import main as detection
+
 # import MLM_detection as mlm_detection
 import submitit
-
-import main as detection
 
 
 def parse_args():

@@ -8,9 +8,8 @@ from typing import Dict, Optional
 import torch
 import torch.distributed
 import torch.nn.functional as F
-from torch import nn
-
 import util.dist as dist
+from torch import nn
 from util import box_ops
 from util.metrics import accuracy
 from util.misc import NestedTensor, interpolate
@@ -23,7 +22,7 @@ from .transformer import build_transformer
 
 
 class MDETR(nn.Module):
-    """ This is the MDETR module that performs modulated object detection """
+    """This is the MDETR module that performs modulated object detection"""
 
     def __init__(
         self,
@@ -695,7 +694,7 @@ class SetCriterion(nn.Module):
 
 
 class MLP(nn.Module):
-    """ Very simple multi-layer perceptron (also called FFN)"""
+    """Very simple multi-layer perceptron (also called FFN)"""
 
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
         super().__init__()

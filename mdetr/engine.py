@@ -10,7 +10,6 @@ from typing import Dict, Iterable, Optional
 import torch
 import torch.nn
 import torch.optim
-
 import util.dist as dist
 from datasets.clevrref import ClevrRefEvaluator
 from datasets.coco_eval import CocoEvaluator

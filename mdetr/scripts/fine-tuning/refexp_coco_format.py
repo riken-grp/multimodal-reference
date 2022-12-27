@@ -8,8 +8,9 @@ import argparse
 import json
 import os
 import pickle
-from pathlib import Path
 import sys
+from pathlib import Path
+
 PACKAGE_PARENT = ".."
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
@@ -44,7 +45,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def convert(dataset_path: Path, dataset_name: str, split: str, output_path, coco_path, next_img_id: int = 0, next_id: int = 0):
+def convert(
+    dataset_path: Path, dataset_name: str, split: str, output_path, coco_path, next_img_id: int = 0, next_id: int = 0
+):
     """Do the heavy lifting on the given split (eg 'train')"""
 
     print(f"Exporting {split}...")
@@ -126,7 +129,13 @@ def main(args):
     for dataset_name in ["refcoco/refs(unc).p", "refcoco+/refs(unc).p", "refcocog/refs(umd).p"]:
         for split in ["train", "val"]:
             next_img_id, next_id = convert(
-                data_path, dataset_name, split, output_path, args.coco_path, next_img_id=next_img_id, next_id=next_id,
+                data_path,
+                dataset_name,
+                split,
+                output_path,
+                args.coco_path,
+                next_img_id=next_img_id,
+                next_id=next_id,
             )
 
 

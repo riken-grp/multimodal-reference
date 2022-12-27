@@ -56,14 +56,14 @@ The config for this dataset can be found in configs/clevr.json and is also shown
 ### Evaluating pre-trained models
 
 You can run an evaluation of our pre-train model on the val set as follows:
-``` 
+```
 python main.py --batch_size 64 --dataset_config configs/clevr.json --num_queries 25 --text_encoder_type distilroberta-base --backbone resnet18  --resume https://zenodo.org/record/4721981/files/clevr_checkpoint.pth  --eval
 ```
 
 Alternatively, you can also dump the model's predictions on the test (or val) set. For that you'll need the questions from the [CLEVR webpage](https://cs.stanford.edu/people/jcjohns/clevr/).
-``` 
+```
 python scripts/eval_clevr.py --batch_size 64 --dataset_config configs/clevr.json  --resume https://zenodo.org/record/4721981/files/clevr_checkpoint.pth --clevr_eval_path /path/to/CLEVR_v1.0/questions/ --split test
-``` 
+```
 
 
 ### Training Step 1: CLEVR-Medium
@@ -131,14 +131,14 @@ The images are the same as regular CLEVR, but you need to download the annotatio
 ### Evaluating pre-trained models
 
 You can run an evaluation of our pre-train model on the val set as follows:
-``` 
+```
 python main.py --batch_size 64 --dataset_config configs/clevr_humans.json --num_queries 25 --text_encoder_type distilroberta-base --backbone resnet18  --resume https://zenodo.org/record/4721981/files/clevr_humans_checkpoint.pth  --eval
 ```
 
-Alternatively, you can also dump the model's predictions on the test set. 
-``` 
+Alternatively, you can also dump the model's predictions on the test set.
+```
 python scripts/eval_clevr.py --batch_size 64 --dataset_config configs/clevr_humans.json  --resume https://zenodo.org/record/4721981/files/clevr_humans_checkpoint.pth --clevr_eval_path /path/to/CLEVR-Humans/ --split test
-``` 
+```
 
 ### Training
 
@@ -190,14 +190,14 @@ Download the original CLEVR-CoGenT images from : [CLEVR webpage](https://cs.stan
 ### Evaluating pre-trained models
 
 You can run an evaluation of our pre-train model on the valA set as follows:
-``` 
+```
 python main.py --batch_size 64 --dataset_config configs/clevr.json --num_queries 25 --text_encoder_type distilroberta-base --backbone resnet18  --resume https://zenodo.org/record/4721981/files/clevr_checkpoint.pth  --eval
 ```
 
 Alternatively, you can also dump the model's predictions on the testB set. For that you'll need the questions from the [CLEVR webpage](https://cs.stanford.edu/people/jcjohns/clevr/).
-``` 
+```
 python scripts/eval_clevr.py --batch_size 64 --dataset_config configs/clevr_cogent.json  --resume https://zenodo.org/record/4721981/files/clevr_cogent_checkpoint.pth --clevr_eval_path /path/to/CLEVR_CoGenT_v1.0/questions/ --split testA
-``` 
+```
 
 Replace `testA` with `testB` to get the predictions on the other test set.
 

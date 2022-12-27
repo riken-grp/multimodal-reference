@@ -139,11 +139,12 @@ def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corne
 
     if input.shape[1] == 0:
         # Pytorch doesn't support null dimension on the channel dimension, so we transpose to fake a null batch dim
-        return torch.nn.functional.interpolate(input.transpose(0, 1), size, scale_factor, mode, align_corners).transpose(0, 1)
+        return torch.nn.functional.interpolate(
+            input.transpose(0, 1), size, scale_factor, mode, align_corners
+        ).transpose(0, 1)
 
     # empty batch dimension is now supported in pytorch
     return torch.nn.functional.interpolate(input, size, scale_factor, mode, align_corners)
-
 
 
 def targets_to(targets: List[Dict[str, Any]], device):

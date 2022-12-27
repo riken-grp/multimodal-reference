@@ -140,7 +140,7 @@ class Transformer(nn.Module):
 
             img_memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)  # (img+text, b, hid)
 
-            text_memory = img_memory[-len(text_memory_resized):]  # (text, b, hid)
+            text_memory = img_memory[-len(text_memory_resized) :]  # (text, b, hid)
 
             assert img_memory.shape[1] == text_memory.shape[1] == tgt.shape[1], 'batch size not identical'
             memory_cache = {

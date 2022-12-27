@@ -11,7 +11,6 @@ import torchvision
 from timm.models import create_model
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
-
 from util.misc import NestedTensor
 
 from .position_encoding import build_position_encoding
@@ -146,7 +145,7 @@ class TimmBackbone(nn.Module):
             replace_bn(backbone)
         num_channels = backbone.feature_info.channels()[-1]
         self.body = backbone
-        self.num_channels =  num_channels
+        self.num_channels = num_channels
         self.interm = return_interm_layers
         self.main_layer = main_layer
 

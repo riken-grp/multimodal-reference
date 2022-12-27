@@ -6,7 +6,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
-
 from util import box_ops
 
 
@@ -117,7 +116,7 @@ class PostProcessPhrasecut(nn.Module):
 
 
 class PostProcess(nn.Module):
-    """ This module converts the model's output into the format expected by the coco api"""
+    """This module converts the model's output into the format expected by the coco api"""
 
     @torch.no_grad()
     def forward(self, outputs, target_sizes):

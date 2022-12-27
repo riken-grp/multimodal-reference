@@ -1,9 +1,8 @@
 # Copyright (c) Aishwarya Kamath & Nicolas Carion. Licensed under the Apache License 2.0. All Rights Reserved
 from pathlib import Path
 
-from transformers import AutoTokenizer
-
 import datasets.transforms as T
+from transformers import AutoTokenizer
 
 from .coco import ModulatedDetection, make_coco_transforms
 
