@@ -7,7 +7,7 @@ authors = ["nobu-g <ueda-n127@hotmail.co.jp>"]
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
 tqdm = "^4.64"
-rhoknp = "~1.0.2"
+rhoknp = "~1.1.0"
 dataclasses-json = "^0.5.7"
 
 [tool.poetry.group.mdetr.dependencies]
@@ -18,7 +18,7 @@ scikit-image = "^0.19.3"
 transformers = "4.6.1"
 tokenizers = ">=0.10.1,<0.11.0"
 portion = "^2.3.0"
-timm = "^0.6.12"
+timm = "0.5.4"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.9"
