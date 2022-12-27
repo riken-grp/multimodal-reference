@@ -26,4 +26,5 @@ repos:
         exclude: mdetr/
         additional_dependencies:
           - rhoknp==1.1.0
-#          - transformers==4.6.1
+          - torch==1.12.1
+          - transformers==4.6.1
