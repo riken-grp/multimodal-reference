@@ -2,7 +2,7 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
-from dataclasses_json import dataclass_json
+from dataclasses_json import LetterCase, dataclass_json
 from rhoknp import KWJA, Document
 
 from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
@@ -16,7 +16,7 @@ class ImageInfo:
     time: int
 
 
-@dataclass_json
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
 class UtteranceInfo:
     text: str
@@ -28,7 +28,7 @@ class UtteranceInfo:
     image_ids: list[str]
 
 
-@dataclass_json
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
 class DatasetInfo:
     scenario_id: str
@@ -36,18 +36,18 @@ class DatasetInfo:
     images: list[ImageInfo]
 
 
-@dataclass_json
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
 class Phrase:
     sid: str
-    phrase_id: int
+    index: int
     text: str
     relation: str
     image: ImageInfo
-    bounding_boxes: list[BoundingBox]
+    bounding_boxes: set[BoundingBox]
 
 
-@dataclass_json
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
 class PhraseGroundingResult:
     scenario_id: str
@@ -76,17 +76,35 @@ def main():
 def run_mdetr(
     mdetr_checkpoint_path: Path, dataset_info: DatasetInfo, image_dir: Path, document: Document
 ) -> PhraseGroundingResult:
-    phrases: list[Phrase] = []
+    all_phrases: list[Phrase] = []
     sid2sentence = {sentence.sid: sentence for sentence in document.sentences}
     for utterance in dataset_info.utterances:
         corresponding_images = [image for image in dataset_info.images if image.id in utterance.image_ids]
         caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
         for image in corresponding_images:
+            phrases: list[Phrase] = []
+            for base_phrase in caption.base_phrases:
+                phrases.append(
+                    Phrase(
+                        sid=base_phrase.sentence.sid,
+                        index=base_phrase.index,
+                        text=base_phrase.text,
+                        relation='=',
+                        image=image,
+                        bounding_boxes=set(),
+                    )
+                )
             image_path = image_dir.joinpath(image.path)
             prediction: MDETRPrediction = predict_mdetr(mdetr_checkpoint_path, image_path, caption)
-            print(prediction)
+            for bounding_box in prediction.bounding_boxes:
+                for global_index, (word, prob) in enumerate(zip(prediction.words, bounding_box.word_probs)):
+                    morpheme = caption.morphemes[global_index]
+                    assert morpheme.text == word
+                    if prob > 0.1:
+                        phrases[global_index].bounding_boxes.add(bounding_box)
+            all_phrases.extend(phrases)
 
-    return PhraseGroundingResult(scenario_id=dataset_info.scenario_id, phrases=phrases)
+    return PhraseGroundingResult(scenario_id=dataset_info.scenario_id, phrases=all_phrases)
 
 
 if __name__ == '__main__':
