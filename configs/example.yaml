@@ -1,0 +1,4 @@
+cohesion:
+  python: /path/to/cohesion/.venv/bin/python
+  project_root: /path/to/cohesion
+  checkpoint: /path/to/trained/cohesion/checkpoint
