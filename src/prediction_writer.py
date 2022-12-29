@@ -13,7 +13,7 @@ from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
 
 
 class CamelCaseDataClassJsonMixin(DataClassJsonMixin):
-    dataclasses_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']
+    dataclass_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']
 
 
 @dataclass
@@ -36,8 +36,6 @@ class UtteranceInfo(CamelCaseDataClassJsonMixin):
 
 @dataclass
 class DatasetInfo(CamelCaseDataClassJsonMixin):
-    dataclass_json_config = dict(letter_case=LetterCase.CAMEL)
-
     scenario_id: str
     utterances: list[UtteranceInfo]
     images: list[ImageInfo]
