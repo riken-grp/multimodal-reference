@@ -1,24 +1,30 @@
-import argparse
+import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from dataclasses_json import LetterCase, dataclass_json
-from rhoknp import KWJA, Document
+import hydra
+from dataclasses_json import DataClassJsonMixin, LetterCase, config
+from omegaconf import DictConfig
+from PIL import Image, ImageFile
+from rhoknp import Document
 
 from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
 
 
-@dataclass_json
+class CamelCaseDataClassJsonMixin(DataClassJsonMixin):
+    dataclasses_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']
+
+
 @dataclass
-class ImageInfo:
+class ImageInfo(CamelCaseDataClassJsonMixin):
     id: str
     path: str
     time: int
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
-class UtteranceInfo:
+class UtteranceInfo(CamelCaseDataClassJsonMixin):
     text: str
     sids: list[str]
     start: int
@@ -28,17 +34,17 @@ class UtteranceInfo:
     image_ids: list[str]
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
-class DatasetInfo:
+class DatasetInfo(CamelCaseDataClassJsonMixin):
+    dataclass_json_config = dict(letter_case=LetterCase.CAMEL)
+
     scenario_id: str
     utterances: list[UtteranceInfo]
     images: list[ImageInfo]
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
-class Phrase:
+class Phrase(CamelCaseDataClassJsonMixin):
     sid: str
     index: int
     text: str
@@ -47,35 +53,44 @@ class Phrase:
     bounding_boxes: set[BoundingBox]
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass
-class PhraseGroundingResult:
+class PhraseGroundingResult(CamelCaseDataClassJsonMixin):
     scenario_id: str
     phrases: list[Phrase]
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--mdetr-checkpoint', type=Path)
-    parser.add_argument('--dataset-dir', type=Path)
-    parser.add_argument('--prediction-dir', type=Path)
-    args = parser.parse_args()
+@hydra.main(version_base=None, config_path="../configs")
+def main(cfg: DictConfig) -> None:
 
-    dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath('info.json').read_text())
-    document = Document.from_knp(args.dataset_dir.joinpath('raw.knp').read_text())
-    image_dir = args.dataset_dir.joinpath('images')
+    dataset_dir = Path(cfg.dataset_dir)
+    prediction_dir = Path(cfg.prediction_dir)
 
-    kwja = KWJA()
-    parsed_document: Document = kwja.apply_to_document(document)
-    args.prediction_dir.joinpath(f'{parsed_document.did}.knp').write_text(parsed_document.to_knp())
+    dataset_info = DatasetInfo.from_json(dataset_dir.joinpath('info.json').read_text())
+    input_knp_file = dataset_dir.joinpath('raw.knp')
+    image_dir = dataset_dir.joinpath('images')
 
-    phrase_grounding_result = run_mdetr(args.mdetr_checkpoint, dataset_info, image_dir, parsed_document)
-    args.prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(phrase_grounding_result.to_json())
+    parsed_document: Document = run_cohesion(cfg.cohesion, input_knp_file)
+    prediction_dir.joinpath(f'{parsed_document.did}.knp').write_text(parsed_document.to_knp())
+
+    phrase_grounding_result = run_mdetr(cfg.mdetr, dataset_info, image_dir, parsed_document)
+    prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(phrase_grounding_result.to_json())
 
 
-def run_mdetr(
-    mdetr_checkpoint_path: Path, dataset_info: DatasetInfo, image_dir: Path, document: Document
-) -> PhraseGroundingResult:
+def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:
+    with tempfile.TemporaryDirectory() as out_dir:
+        subprocess.run(
+            [
+                cfg.python,
+                f'{cfg.project_root}/src/predict.py',
+                f'checkpoint={cfg.checkpoint}',
+                f'input_path={input_knp_file}',
+                f'export_dir={out_dir}',
+            ]
+        )
+        return Document.from_knp(next(Path(out_dir).glob('*.knp')).read_text())
+
+
+def run_mdetr(cfg: DictConfig, dataset_info: DatasetInfo, image_dir: Path, document: Document) -> PhraseGroundingResult:
     all_phrases: list[Phrase] = []
     sid2sentence = {sentence.sid: sentence for sentence in document.sentences}
     for utterance in dataset_info.utterances:
@@ -94,8 +109,8 @@ def run_mdetr(
                         bounding_boxes=set(),
                     )
                 )
-            image_path = image_dir.joinpath(image.path)
-            prediction: MDETRPrediction = predict_mdetr(mdetr_checkpoint_path, image_path, caption)
+            image_file: ImageFile = Image.open(image_dir.joinpath(image.path))
+            prediction: MDETRPrediction = predict_mdetr(cfg.checkpoint, image_file, caption)
             for bounding_box in prediction.bounding_boxes:
                 for global_index, (word, prob) in enumerate(zip(prediction.words, bounding_box.word_probs)):
                     morpheme = caption.morphemes[global_index]

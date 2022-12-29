@@ -181,7 +181,7 @@ def main():
     # url = "http://images.cocodataset.org/val2017/000000281759.jpg"
     # web_image = requests.get(url, stream=True).raw
     # image = Image.open(web_image)
-    image: ImageFile = Image.open(args.image_path)
+    image = Image.open(args.image_path)
 
     prediction = predict_mdetr(args.model, image, Jumanpp().apply_to_document(args.text))
     plot_results(image, prediction)
