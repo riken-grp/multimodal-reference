@@ -50,7 +50,7 @@ class Phrase(CamelCaseDataClassJsonMixin):
     text: str
     relation: str
     image: ImageInfo
-    bounding_boxes: set[BoundingBox]
+    bounding_boxes: list[BoundingBox]
 
 
 @dataclass
@@ -67,12 +67,11 @@ def main(cfg: DictConfig) -> None:
 
     dataset_info = DatasetInfo.from_json(dataset_dir.joinpath('info.json').read_text())
     input_knp_file = dataset_dir.joinpath('raw.knp')
-    image_dir = dataset_dir.joinpath('images')
 
     parsed_document: Document = run_cohesion(cfg.cohesion, input_knp_file)
     prediction_dir.joinpath(f'{parsed_document.did}.knp').write_text(parsed_document.to_knp())
 
-    phrase_grounding_result = run_mdetr(cfg.mdetr, dataset_info, image_dir, parsed_document)
+    phrase_grounding_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
     prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(phrase_grounding_result.to_json())
 
 
@@ -90,34 +89,36 @@ def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:
         return Document.from_knp(next(Path(out_dir).glob('*.knp')).read_text())
 
 
-def run_mdetr(cfg: DictConfig, dataset_info: DatasetInfo, image_dir: Path, document: Document) -> PhraseGroundingResult:
+def run_mdetr(
+    cfg: DictConfig, dataset_info: DatasetInfo, dataset_dir: Path, document: Document
+) -> PhraseGroundingResult:
     all_phrases: list[Phrase] = []
     sid2sentence = {sentence.sid: sentence for sentence in document.sentences}
     for utterance in dataset_info.utterances:
         corresponding_images = [image for image in dataset_info.images if image.id in utterance.image_ids]
         caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
         for image in corresponding_images:
-            phrases: list[Phrase] = []
-            for base_phrase in caption.base_phrases:
-                phrases.append(
-                    Phrase(
-                        sid=base_phrase.sentence.sid,
-                        index=base_phrase.index,
-                        text=base_phrase.text,
-                        relation='=',
-                        image=image,
-                        bounding_boxes=set(),
-                    )
+            phrases: list[Phrase] = [
+                Phrase(
+                    sid=base_phrase.sentence.sid,
+                    index=base_phrase.index,
+                    text=base_phrase.text,
+                    relation='=',
+                    image=image,
+                    bounding_boxes=[],
                 )
-            image_file: ImageFile = Image.open(image_dir.joinpath(image.path))
+                for base_phrase in caption.base_phrases
+            ]
+            image_file: ImageFile = Image.open(dataset_dir.joinpath(image.path))
             prediction: MDETRPrediction = predict_mdetr(cfg.checkpoint, image_file, caption)
             for bounding_box in prediction.bounding_boxes:
-                for global_index, (word, prob) in enumerate(zip(prediction.words, bounding_box.word_probs)):
-                    morpheme = caption.morphemes[global_index]
-                    assert morpheme.text == word
-                    if prob > 0.1:
-                        phrases[global_index].bounding_boxes.add(bounding_box)
-            all_phrases.extend(phrases)
+                for phrase, base_phrase in zip(phrases, caption.base_phrases):
+                    words = [prediction.words[m.global_index] for m in base_phrase.morphemes]
+                    assert ''.join(words) == phrase.text == base_phrase.text
+                    prob = max(bounding_box.word_probs[m.global_index] for m in base_phrase.morphemes)
+                    if prob >= 0.1:
+                        phrase.bounding_boxes.append(bounding_box)
+            all_phrases.extend(filter(lambda p: p.bounding_boxes, phrases))
 
     return PhraseGroundingResult(scenario_id=dataset_info.scenario_id, phrases=all_phrases)
 
