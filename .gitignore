@@ -161,5 +161,7 @@ cython_debug/
 data
 
 *.png
+outputs/*
 configs/*
 !configs/example.yaml
+!configs/base.yaml
