@@ -1,9 +1,5 @@
 import json
-import sys
 from pathlib import Path
-
-sys.path.append(str(Path(__file__).parent.parent))
-sys.path.append(str(Path(__file__).parent / 'scripts'))
 
 from scripts.convert_dataset import convert  # noqa: E402
 from scripts.flickr30k_entities_utils import get_annotations, get_sentence_data  # noqa: E402

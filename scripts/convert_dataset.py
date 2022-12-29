@@ -1,12 +1,15 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from flickr30k_entities_utils import get_annotations, get_sentence_data, get_sentence_data_ja
 from tqdm import tqdm
 
 
-def convert(sentence_data: dict, annotation_data: dict, image_id: str, sent_id_from: int = 0, ann_id_from: int = 0):
+def convert(
+    sentence_data: dict, annotation_data: dict, image_id: str, sent_id_from: int = 0, ann_id_from: int = 0
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     sent_id = sent_id_from
     ann_id = ann_id_from
     phrase_id = 0
@@ -45,7 +48,7 @@ def convert(sentence_data: dict, annotation_data: dict, image_id: str, sent_id_f
         }
 
         for phrase in sent['phrases']:
-            for bbox in annotation_data['boxes'].get(phrase['phrase_id'], []):
+            for bbox in sorted(annotation_data['boxes'].get(phrase['phrase_id'], [])):
                 x1, y1, x2, y2 = bbox
                 annotation = {
                     'area': (x2 - x1) * (y2 - y1),
