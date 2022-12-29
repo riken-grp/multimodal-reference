@@ -23,6 +23,7 @@ timm = "0.5.4"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.9"
+pytest = "^7.2.0"
 
 [build-system]
 requires = ["poetry-core"]
