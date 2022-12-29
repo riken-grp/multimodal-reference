@@ -1,0 +1,25 @@
+defaults:
+  - _self_
+
+project: multimodal-reference
+
+work_dir: ${hydra:runtime.cwd}
+
+# name of the run is accessed by loggers
+# should be used along with experiment mode
+name: ${hydra:job.config_name}-${hydra:job.override_dirname}
+
+exp_dir: ${work_dir}/result/${name}
+config_name: ${hydra:job.config_name}
+
+hydra:
+  run:
+    dir: ${exp_dir}
+  sweep:
+    dir: ${work_dir}/multirun_result
+    subdir: ${name}-${hydra:job.num}
+  job:
+    config:
+      override_dirname:
+        kv_sep: '_'
+        item_sep: '-'

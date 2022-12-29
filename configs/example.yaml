@@ -1,4 +1,14 @@
+defaults:
+  - base.yaml
+  - _self_
+
 cohesion:
   python: /path/to/cohesion/.venv/bin/python
   project_root: /path/to/cohesion
   checkpoint: /path/to/trained/cohesion/checkpoint
+
+mdetr:
+  checkpoint: /path/to/trained/mdetr/checkpoint
+
+dataset_dir: /path/to/dataset
+prediction_dir: /path/to/prediction
