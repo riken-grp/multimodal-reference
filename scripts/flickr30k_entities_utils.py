@@ -81,8 +81,7 @@ def get_sentence_data_ja(fn):
         chunks = []
         raw_sentence = ''
         sidx = 0
-        matches: list[re.Match] = list(re.finditer(tag_pat, line))
-        for match in matches:
+        for match in re.finditer(tag_pat, line):
             # chunk 前を追加
             if sidx < match.start():
                 text = line[sidx : match.start()]  # noqa
