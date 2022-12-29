@@ -72,7 +72,9 @@ def main(cfg: DictConfig) -> None:
     prediction_dir.joinpath(f'{parsed_document.did}.knp').write_text(parsed_document.to_knp())
 
     phrase_grounding_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
-    prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(phrase_grounding_result.to_json())
+    prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(
+        phrase_grounding_result.to_json(ensure_ascii=False, indent=2)
+    )
 
 
 def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:

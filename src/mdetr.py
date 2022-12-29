@@ -142,7 +142,9 @@ def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> MD
     bboxes_scaled = rescale_bboxes(pred_boxes[0, keep], im.size)  # (kept, 4)
 
     bounding_boxes = []
-    for prob, bbox, token_probs in zip(probs[keep], bboxes_scaled.tolist(), pred_logits[0, keep].softmax(dim=-1)):
+    for prob, bbox, token_probs in zip(
+        probs[keep].tolist(), bboxes_scaled.tolist(), pred_logits[0, keep].softmax(dim=-1)
+    ):
         char_probs: list[float] = [0] * len(caption.text)
         for pos, token_prob in enumerate(token_probs.tolist()):
             try:
