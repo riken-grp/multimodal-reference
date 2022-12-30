@@ -4,41 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import hydra
-from dataclasses_json import DataClassJsonMixin, LetterCase, config
 from omegaconf import DictConfig
 from PIL import Image, ImageFile
 from rhoknp import Document
 
 from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
-
-
-class CamelCaseDataClassJsonMixin(DataClassJsonMixin):
-    dataclass_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']
-
-
-@dataclass
-class ImageInfo(CamelCaseDataClassJsonMixin):
-    id: str
-    path: str
-    time: int
-
-
-@dataclass
-class UtteranceInfo(CamelCaseDataClassJsonMixin):
-    text: str
-    sids: list[str]
-    start: int
-    end: int
-    duration: int
-    speaker: str
-    image_ids: list[str]
-
-
-@dataclass
-class DatasetInfo(CamelCaseDataClassJsonMixin):
-    scenario_id: str
-    utterances: list[UtteranceInfo]
-    images: list[ImageInfo]
+from utils import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
 
 
 @dataclass

@@ -1,11 +1,39 @@
 from dataclasses import dataclass
 
-from dataclasses_json import dataclass_json
+from dataclasses_json import DataClassJsonMixin, LetterCase, config
 
 
-@dataclass_json
+class CamelCaseDataClassJsonMixin(DataClassJsonMixin):
+    dataclass_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']
+
+
+@dataclass
+class ImageInfo(CamelCaseDataClassJsonMixin):
+    id: str
+    path: str
+    time: int
+
+
+@dataclass
+class UtteranceInfo(CamelCaseDataClassJsonMixin):
+    text: str
+    sids: list[str]
+    start: int
+    end: int
+    duration: int
+    speaker: str
+    image_ids: list[str]
+
+
+@dataclass
+class DatasetInfo(CamelCaseDataClassJsonMixin):
+    scenario_id: str
+    utterances: list[UtteranceInfo]
+    images: list[ImageInfo]
+
+
 @dataclass(frozen=True)
-class Rectangle:
+class Rectangle(DataClassJsonMixin):
     x1: int
     y1: int
     x2: int
