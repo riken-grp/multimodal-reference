@@ -4,7 +4,7 @@ from dataclasses_json import DataClassJsonMixin, LetterCase, config
 
 
 class CamelCaseDataClassJsonMixin(DataClassJsonMixin):
-    dataclass_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']
+    dataclass_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']  # type: ignore
 
 
 @dataclass
