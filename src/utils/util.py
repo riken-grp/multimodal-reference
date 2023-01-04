@@ -84,3 +84,10 @@ class Rectangle(DataClassJsonMixin):
         return Rectangle.from_xyxy(
             max(xyxy1[0], xyxy2[0]), max(xyxy1[1], xyxy2[1]), min(xyxy1[2], xyxy2[2]), min(xyxy1[3], xyxy2[3])
         )
+
+
+def box_iou(box1: Rectangle, box2: Rectangle) -> float:
+    if box1.area == 0 or box2.area == 0:
+        return 0
+    intersect: int = (box1 & box2).area
+    return intersect / (box1.area + box2.area - intersect)

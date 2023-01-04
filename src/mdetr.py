@@ -12,7 +12,7 @@ from PIL import Image, ImageFile
 from rhoknp import Document, Jumanpp
 from transformers import BatchEncoding, CharSpan
 
-from utils import Rectangle
+from utils.util import Rectangle
 
 sys.path.append('./mdetr')
 from hubconf import _make_detr  # noqa: E402

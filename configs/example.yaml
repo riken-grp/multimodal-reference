@@ -11,4 +11,5 @@ mdetr:
   checkpoint: /path/to/trained/mdetr/checkpoint
 
 dataset_dir: /path/to/dataset
+gold_knp_file: /path/to/gold/knp/file
 prediction_dir: /path/to/prediction
