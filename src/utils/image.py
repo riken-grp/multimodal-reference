@@ -1,47 +1,42 @@
 from dataclasses import dataclass
 
-from dataclasses_json import DataClassJsonMixin
+from utils.util import CamelCaseDataClassJsonMixin, Rectangle
 
 
-@dataclass
-class BoundingBox(DataClassJsonMixin):
+@dataclass(frozen=True)
+class BoundingBox(CamelCaseDataClassJsonMixin):
     image_id: str
-    id: str
-    bb: list[int]  # [x, y, w, h]
+    instance_id: str
+    rect: Rectangle
     class_name: str
-    auto_flg: bool  # true: 自動推定, false: 手動指定
 
 
-@dataclass
-class Caption(DataClassJsonMixin):
-    image_id: str
-    id: str  # same as image_id
+@dataclass(frozen=True)
+class Phrase2ObjectRelation(CamelCaseDataClassJsonMixin):
+    type: str  # ガ, ヲ, ニ, ノ, =, etc...
+    instance_id: str
+
+
+@dataclass(frozen=True)
+class PhraseAnnotation(CamelCaseDataClassJsonMixin):
     text: str
+    relations: list[Phrase2ObjectRelation]
 
 
-@dataclass
-class ImageRelation(DataClassJsonMixin):
-    image_id: str
-    id: str
-    from_: str
-    to: str
-    relation: str  # class name of the relation
-    auto_flg: bool  # true: 自動推定, false: 手動指定
-
-
-@dataclass
-class Image2TextRelation(DataClassJsonMixin):
-    image_id: str
-    id: str
-    visual_id: str
-    caption_id: str
-    caption_region: list[int]
-
-
-@dataclass
-class ImageAnnotation(DataClassJsonMixin):
+@dataclass(frozen=True)
+class ImageAnnotation(CamelCaseDataClassJsonMixin):
     image_id: str
     bounding_boxes: list[BoundingBox]
-    caption: Caption
-    relations: list[ImageRelation]
-    i2t_relations: list[Image2TextRelation]
+
+
+@dataclass(frozen=True)
+class UtteranceAnnotation(CamelCaseDataClassJsonMixin):
+    text: str
+    phrases: list[PhraseAnnotation]
+
+
+@dataclass(frozen=True)
+class ImageTextAnnotation(CamelCaseDataClassJsonMixin):
+    scenario_id: str
+    images: list[ImageAnnotation]
+    utterances: list[UtteranceAnnotation]
