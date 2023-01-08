@@ -1,5 +1,6 @@
 import argparse
 import itertools
+from dataclasses import dataclass
 from pathlib import Path
 
 from rhoknp import Document
@@ -87,11 +88,41 @@ class MMRefEvaluator:
             tp = vs.count('tp')
             fn = vs.count('fn')
             fp = vs.count('fp')
-            precision = tp / (tp + fp) if tp + fp > 0 else 0
-            recall = tp / (tp + fn) if tp + fn > 0 else 0
-            f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
-            eval_result[rel] = {'precision': precision, 'recall': recall, 'f1': f1}
+            measure = Measure(correct=tp, denom_gold=tp + fn, denom_pred=tp + fp)
+            eval_result[rel] = measure
         return eval_result
+
+
+@dataclass
+class Measure:
+    """A data class to calculate and represent F-measure"""
+
+    correct: int = 0
+    denom_gold: int = 0
+    denom_pred: int = 0
+
+    def __add__(self, other: 'Measure'):
+        return Measure(
+            self.denom_pred + other.denom_pred, self.denom_gold + other.denom_gold, self.correct + other.correct
+        )
+
+    @property
+    def precision(self) -> float:
+        if self.denom_pred == 0:
+            return 0.0
+        return self.correct / self.denom_pred
+
+    @property
+    def recall(self) -> float:
+        if self.denom_gold == 0:
+            return 0.0
+        return self.correct / self.denom_gold
+
+    @property
+    def f1(self) -> float:
+        if self.denom_pred + self.denom_gold == 0:
+            return 0.0
+        return 2 * self.correct / (self.denom_pred + self.denom_gold)
 
 
 def main():
