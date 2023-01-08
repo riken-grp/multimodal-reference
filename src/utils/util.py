@@ -81,9 +81,8 @@ class Rectangle(DataClassJsonMixin):
         if isinstance(other, type(self)) is False:
             raise TypeError(f"unsupported operand type(s) for &: '{type(self)}' and '{type(other)}'")
         xyxy1, xyxy2 = self.to_xyxy(), other.to_xyxy()
-        return Rectangle.from_xyxy(
-            max(xyxy1[0], xyxy2[0]), max(xyxy1[1], xyxy2[1]), min(xyxy1[2], xyxy2[2]), min(xyxy1[3], xyxy2[3])
-        )
+        xyxy = max(xyxy1[0], xyxy2[0]), max(xyxy1[1], xyxy2[1]), min(xyxy1[2], xyxy2[2]), min(xyxy1[3], xyxy2[3])
+        return Rectangle.from_xyxy(xyxy[0], xyxy[1], max(xyxy[0], xyxy[2]), max(xyxy[1], xyxy[3]))
 
 
 def box_iou(box1: Rectangle, box2: Rectangle) -> float:
