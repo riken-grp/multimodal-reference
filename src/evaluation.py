@@ -55,33 +55,39 @@ class MMRefEvaluator:
                     relation_type = gold_relation.type
                     gold_bounding_box = instance_id_to_bounding_box[gold_relation.instance_id]
                     gold_box: Rectangle = gold_bounding_box.rect
-                    for pred_phrase in pred_phrases:
-                        if pred_phrase.relation != relation_type:
-                            continue
+                    key = (image_id, sid, phrase.index, relation_type, gold_bounding_box.instance_id)
+                    rel_pred_phrases = [p for p in pred_phrases if p.relation == relation_type]
+                    assert len(rel_pred_phrases) in (0, 1)
+                    if len(rel_pred_phrases) == 1:
+                        pred_phrase = rel_pred_phrases[0]
                         pred_boxes = [
                             bb.rect for bb in pred_phrase.bounding_boxes if bb.confidence >= self.confidence_threshold
                         ]
-                        key = (image_id, sid, phrase.index, relation_type, gold_bounding_box.instance_id)
                         if any(box_iou(gold_box, pred_box) >= self.iou_threshold for pred_box in pred_boxes):
                             result_dict[key] = 'tp'
                         else:
                             result_dict[key] = 'fn'
+                    else:
+                        result_dict[key] = 'fn'
+
                 # precision
                 for pred_phrase in pred_phrases:
                     relation_type = pred_phrase.relation
                     gold_relations = [rel for rel in phrase_annotation.relations if rel.type == relation_type]
-                    for pred_bounding_box in pred_phrase.bounding_boxes:
+                    for idx, pred_bounding_box in enumerate(pred_phrase.bounding_boxes):
                         if pred_bounding_box.confidence < self.confidence_threshold:
                             continue
                         pred_box: Rectangle = pred_bounding_box.rect
                         gold_bounding_boxes = [instance_id_to_bounding_box[rel.instance_id] for rel in gold_relations]
-                        for gold_bounding_box in gold_bounding_boxes:
-                            key = (image_id, sid, phrase.index, relation_type, gold_bounding_box.instance_id)
-                            gold_box = gold_bounding_box.rect
-                            if box_iou(gold_box, pred_box) >= self.iou_threshold:
-                                assert result_dict[key] == 'tp'
-                            else:
-                                result_dict[key] = 'fp'
+                        tp_gold_bounding_boxes = [
+                            bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
+                        ]
+                        for tp_gold_bounding_box in tp_gold_bounding_boxes:
+                            key = (image_id, sid, phrase.index, relation_type, tp_gold_bounding_box.instance_id)
+                            assert result_dict[key] == 'tp'
+                        if len(tp_gold_bounding_boxes) == 0:
+                            key = (image_id, sid, phrase.index, relation_type, f'fp_{idx}')
+                            result_dict[key] = 'fp'
         eval_result = {}
         for rel in ('ガ', 'ヲ', 'ニ', 'ノ', '='):
             vs = [v for k, v in result_dict.items() if k[3] == rel]
