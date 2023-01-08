@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent / 'src'))
 sys.path.append(str(Path(__file__).parent.parent / 'scripts'))
 
 
