@@ -1,0 +1,50 @@
+{
+  "scenario_id": "test-0",
+  "utterances": [
+    {
+      "text": "風船の下にギターがある。隣には段ボール箱がある。",
+      "sids": [
+        "test-0-0",
+        "test-0-1"
+      ],
+      "start": 100,
+      "end": 1500,
+      "duration": 1400,
+      "speaker": "主人",
+      "image_ids": [
+        "001",
+        "002"
+      ]
+    },
+    {
+      "text": "上に移動した。",
+      "sids": [
+        "test-0-2"
+      ],
+      "start": 1600,
+      "end": 2500,
+      "duration": 900,
+      "speaker": "ロボット",
+      "image_ids": [
+        "003"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "id": "001",
+      "path": "images/001.png",
+      "time": 0
+    },
+    {
+      "id": "002",
+      "path": "images/002.png",
+      "time": 1000
+    },
+    {
+      "id": "003",
+      "path": "images/003.png",
+      "time": 2000
+    }
+  ]
+}

@@ -1,0 +1,276 @@
+{
+  "scenarioId": "test-0",
+  "images": [
+    {
+      "imageId": "001",
+      "boundingBoxes": [
+        {
+          "imageId": "001",
+          "instanceId": "1",
+          "rect": {
+            "x1": 171,
+            "y1": 236,
+            "x2": 293,
+            "y2": 355
+          },
+          "className": "guitar"
+        },
+        {
+          "imageId": "001",
+          "instanceId": "2",
+          "rect": {
+            "x1": 198,
+            "y1": 154,
+            "x2": 253,
+            "y2": 217
+          },
+          "className": "balloon"
+        },
+        {
+          "imageId": "001",
+          "instanceId": "3",
+          "rect": {
+            "x1": 285,
+            "y1": 146,
+            "x2": 344,
+            "y2": 217
+          },
+          "className": "cardboard_box"
+        },
+        {
+          "imageId": "001",
+          "instanceId": "4",
+          "rect": {
+            "x1": 118,
+            "y1": 155,
+            "x2": 163,
+            "y2": 208
+          },
+          "className": "cardboard_box"
+        }
+      ]
+    },
+    {
+      "imageId": "002",
+      "boundingBoxes": [
+        {
+          "imageId": "002",
+          "instanceId": "2",
+          "rect": {
+            "x1": 188,
+            "y1": 140,
+            "x2": 261,
+            "y2": 222
+          },
+          "className": "balloon"
+        },
+        {
+          "imageId": "002",
+          "instanceId": "3",
+          "rect": {
+            "x1": 285,
+            "y1": 146,
+            "x2": 344,
+            "y2": 216
+          },
+          "className": "cardboard_box"
+        },
+        {
+          "imageId": "002",
+          "instanceId": "4",
+          "rect": {
+            "x1": 118,
+            "y1": 154,
+            "x2": 163,
+            "y2": 209
+          },
+          "className": "cardboard_box"
+        },
+        {
+          "imageId": "002",
+          "instanceId": "1",
+          "rect": {
+            "x1": 171,
+            "y1": 236,
+            "x2": 293,
+            "y2": 355
+          },
+          "className": "guitar"
+        }
+      ]
+    },
+    {
+      "imageId": "003",
+      "boundingBoxes": [
+        {
+          "imageId": "003",
+          "instanceId": "3",
+          "rect": {
+            "x1": 285,
+            "y1": 44,
+            "x2": 344,
+            "y2": 114
+          },
+          "className": "cardboard_box"
+        },
+        {
+          "imageId": "003",
+          "instanceId": "2",
+          "rect": {
+            "x1": 188,
+            "y1": 140,
+            "x2": 261,
+            "y2": 223
+          },
+          "className": "balloon"
+        },
+        {
+          "imageId": "003",
+          "instanceId": "4",
+          "rect": {
+            "x1": 118,
+            "y1": 154,
+            "x2": 163,
+            "y2": 209
+          },
+          "className": "cardboard_box"
+        },
+        {
+          "imageId": "003",
+          "instanceId": "1",
+          "rect": {
+            "x1": 171,
+            "y1": 236,
+            "x2": 293,
+            "y2": 355
+          },
+          "className": "guitar"
+        },
+        {
+          "imageId": "003",
+          "instanceId": "9",
+          "rect": {
+            "x1": 245,
+            "y1": 0,
+            "x2": 377,
+            "y2": 163
+          },
+          "className": "region"
+        }
+      ]
+    }
+  ],
+  "utterances": [
+    {
+      "text": "風船の下にギターがある。隣には段ボール箱がある。",
+      "phrases": [
+        {
+          "text": "風船の",
+          "relations": [
+            {
+              "type": "=",
+              "instanceId": "2"
+            }
+          ]
+        },
+        {
+          "text": "下に",
+          "relations": [
+            {
+              "type": "ノ",
+              "instanceId": "2"
+            }
+          ]
+        },
+        {
+          "text": "ギターが",
+          "relations": [
+            {
+              "type": "=",
+              "instanceId": "1"
+            }
+          ]
+        },
+        {
+          "text": "ある。",
+          "relations": [
+            {
+              "type": "ガ",
+              "instanceId": "1"
+            }
+          ]
+        },
+        {
+          "text": "隣には",
+          "relations": [
+            {
+              "type": "ノ",
+              "instanceId": "2"
+            }
+          ]
+        },
+        {
+          "text": "段ボール",
+          "relations": []
+        },
+        {
+          "text": "箱が",
+          "relations": [
+            {
+              "type": "=",
+              "instanceId": "3"
+            },
+            {
+              "type": "=",
+              "instanceId": "4"
+            }
+          ]
+        },
+        {
+          "text": "ある。",
+          "relations": [
+            {
+              "type": "ガ",
+              "instanceId": "3"
+            },
+            {
+              "type": "ガ",
+              "instanceId": "4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "上に移動した。",
+      "phrases": [
+        {
+          "text": "上に",
+          "relations": [
+            {
+              "type": "=",
+              "instanceId": "9"
+            }
+          ]
+        },
+        {
+          "text": "移動した。",
+          "relations": [
+            {
+              "type": "ガ",
+              "instanceId": "3"
+            },
+            {
+              "type": "ガ",
+              "instanceId": "4"
+            },
+            {
+              "type": "ニ",
+              "instanceId": "9"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

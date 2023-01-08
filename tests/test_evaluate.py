@@ -30,4 +30,9 @@ def test_evaluate(fixture_data_dir: Path):
 
     prediction = PhraseGroundingResult.from_json(evaluate_dir.joinpath('prediction.json').read_text())
 
-    _ = evaluator.eval_visual_reference(prediction)
+    result: dict[str, dict[str, float]] = evaluator.eval_visual_reference(prediction)
+    assert result['ガ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
+    assert result['ヲ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
+    assert result['ニ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
+    assert result['ノ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
+    assert result['='] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}

@@ -1,0 +1,27 @@
+﻿{
+  "boundingBoxClasses": [
+    {
+      "name": "guitar"
+    },
+    {
+      "name": "balloon"
+    },
+    {
+      "name": "cardboard_box"
+    },
+    {
+      "name": "region"
+    }
+  ],
+  "relationClasses": [],
+  "captionRelationClasses": [
+    {
+      "name": "=格"
+    },
+    {
+      "name": "ガ格"
+    }
+  ],
+  "markdownStart": null,
+  "markdownEnd": null
+}

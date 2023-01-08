@@ -1,0 +1,105 @@
+﻿{
+  "image_id": "001",
+  "bounding_boxes": [
+    {
+      "image_id": "001",
+      "id": "10001",
+      "bb": [
+        171,
+        236,
+        122,
+        119
+      ],
+      "class_name": "guitar",
+      "auto_flg": false
+    },
+    {
+      "image_id": "001",
+      "id": "10002",
+      "bb": [
+        198,
+        154,
+        55,
+        63
+      ],
+      "class_name": "baloon",
+      "auto_flg": false
+    },
+    {
+      "image_id": "001",
+      "id": "10003",
+      "bb": [
+        285,
+        146,
+        59,
+        71
+      ],
+      "class_name": "cardboard_box",
+      "auto_flg": false
+    },
+    {
+      "image_id": "001",
+      "id": "10004",
+      "bb": [
+        118,
+        155,
+        45,
+        53
+      ],
+      "class_name": "cardboard_box",
+      "auto_flg": false
+    }
+  ],
+  "caption": {
+    "image_id": "001",
+    "id": "",
+    "text": "<<<風船0>>>の<<<下2>>>に<<<ギター1>>>が<<<ある>>>。<<<隣4>>>には<<<段ボール>>><<<箱3>>>が<<<ある>>>。\\r\\n<<<上5>>>に<<<移動した>>>。"
+  },
+  "relations": [],
+  "i2t_relations": [
+    {
+      "image_id": "001",
+      "id": "16",
+      "visual_id": "10002",
+      "class_name": "=",
+      "caption_id": "",
+      "caption_region": [
+        3,
+        2
+      ]
+    },
+    {
+      "image_id": "001",
+      "id": "30005",
+      "visual_id": "10001",
+      "class_name": "=",
+      "caption_id": "",
+      "caption_region": [
+        12,
+        3
+      ]
+    },
+    {
+      "image_id": "001",
+      "id": "30006",
+      "visual_id": "10003",
+      "class_name": "=",
+      "caption_id": "",
+      "caption_region": [
+        17,
+        1
+      ]
+    },
+    {
+      "image_id": "001",
+      "id": "30007",
+      "visual_id": "10004",
+      "class_name": "=",
+      "caption_id": "",
+      "caption_region": [
+        17,
+        1
+      ]
+    }
+  ]
+}
