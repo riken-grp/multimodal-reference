@@ -19,7 +19,7 @@ class MMRefEvaluator:
         self.image_id_to_annotation: dict[str, ImageAnnotation] = {
             image.image_id: image for image in image_text_annotation.images
         }
-        self.confidence_threshold = 0.8
+        self.confidence_threshold = 0.9
         self.iou_threshold = 0.5
 
     def eval_textual_reference(self, result: PhraseGroundingResult) -> dict:
