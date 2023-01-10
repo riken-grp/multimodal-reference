@@ -35,18 +35,18 @@ class MMRefEvaluator:
         ):
             document = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
             assert document.text == utterance_annotation.text
-            for image_id, phrase in itertools.product(utterance.image_ids, document.base_phrases):
+            for image_id, base_phrase in itertools.product(utterance.image_ids, document.base_phrases):
                 # 対応する gold と system の BB を取得して比較
-                sid = phrase.sentence.sid
+                sid = base_phrase.sentence.sid
                 image_annotation: ImageAnnotation = self.image_id_to_annotation[image_id]
                 instance_id_to_bounding_box: dict[str, BoundingBox] = {
                     bb.instance_id: bb for bb in image_annotation.bounding_boxes
                 }
-                phrase_annotation = utterance_annotation.phrases[phrase.global_index]
-                assert phrase_annotation.text == phrase.text
+                phrase_annotation = utterance_annotation.phrases[base_phrase.global_index]
+                assert phrase_annotation.text == base_phrase.text
                 pred_phrases: list[PhraseResult] = list(
                     filter(
-                        lambda p: p.image.id == image_id and p.sid == sid and p.index == phrase.index,
+                        lambda p: p.image.id == image_id and p.sid == sid and p.index == base_phrase.index,
                         utterance_result.phrases,
                     )
                 )
@@ -58,7 +58,7 @@ class MMRefEvaluator:
                     relation_type = gold_relation.type
                     gold_bounding_box = instance_id_to_bounding_box[gold_relation.instance_id]
                     gold_box: Rectangle = gold_bounding_box.rect
-                    key = (image_id, sid, phrase.index, relation_type, gold_bounding_box.instance_id)
+                    key = (image_id, sid, base_phrase.index, relation_type, gold_bounding_box.instance_id)
                     rel_pred_phrases = [p for p in pred_phrases if p.relation == relation_type]
                     assert len(rel_pred_phrases) in (0, 1)
                     if len(rel_pred_phrases) == 1:
@@ -90,10 +90,10 @@ class MMRefEvaluator:
                             bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
                         ]
                         for tp_gold_bounding_box in tp_gold_bounding_boxes:
-                            key = (image_id, sid, phrase.index, relation_type, tp_gold_bounding_box.instance_id)
+                            key = (image_id, sid, base_phrase.index, relation_type, tp_gold_bounding_box.instance_id)
                             assert result_dict[key] == 'tp'
                         if len(tp_gold_bounding_boxes) == 0:
-                            key = (image_id, sid, phrase.index, relation_type, f'fp_{idx}')
+                            key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}')
                             result_dict[key] = 'fp'
         eval_result = {}
         for rel in ('ガ', 'ヲ', 'ニ', 'ノ', '='):
