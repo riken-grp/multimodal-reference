@@ -1476,6 +1476,37 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "polars"
+version = "0.15.14"
+description = "Blazingly fast DataFrame library"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "polars-0.15.14-cp37-abi3-macosx_10_7_x86_64.whl", hash = "sha256:364f9dee55795254abe6d78f1d2612d66588e9d7da21e408a67821dc1104977b"},
+    {file = "polars-0.15.14-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:e0e6baa463b5b231ec9f8b34dacc7b3be9172c893d105c4147d157098658b754"},
+    {file = "polars-0.15.14-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ea9c868c8f7bb03eb0e2e27def4d759bac43c2c1a485bb85d50231753706df26"},
+    {file = "polars-0.15.14-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a8dc2a74a390cd6b9db0f5dfb869c3618649f0c2f4f91f30738933bedb862816"},
+    {file = "polars-0.15.14-cp37-abi3-win_amd64.whl", hash = "sha256:b1e46e70cd374b005f2a2e4127146107a02595e684442af4325331b640ad16a8"},
+    {file = "polars-0.15.14.tar.gz", hash = "sha256:899441090b70451c5306b5d3ff6dce5407bcfce3753922a61eca046dca26df68"},
+]
+
+[package.dependencies]
+typing_extensions = {version = ">=4.0.0", markers = "python_version < \"3.10\""}
+
+[package.extras]
+all = ["polars[connectorx,deltalake,fsspec,matplotlib,numpy,pandas,pyarrow,timezone,xlsx2csv]"]
+connectorx = ["connectorx"]
+deltalake = ["deltalake"]
+fsspec = ["fsspec"]
+matplotlib = ["matplotlib"]
+numpy = ["numpy (>=1.16.0)"]
+pandas = ["pandas", "pyarrow (>=4.0.0)"]
+pyarrow = ["pyarrow (>=4.0.0)"]
+timezone = ["backports.zoneinfo", "tzdata"]
+xlsx2csv = ["xlsx2csv (>=0.8.0)"]
+
+[[package]]
 name = "portion"
 version = "2.3.0"
 description = "Python data structure and operations for intervals"
@@ -2632,4 +2663,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.11"
-content-hash = "520c1d07b46d7124c4bfa369308b92f4ad80a01bc347ebce0a3de17f8683abc9"
+content-hash = "a52a091372e8be7d2b41fab06c19c4fbfe74137b801826205ec5c0a14e84a23c"
