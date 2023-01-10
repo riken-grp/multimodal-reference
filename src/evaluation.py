@@ -52,6 +52,9 @@ class MMRefEvaluator:
                 )
                 # recall
                 for gold_relation in phrase_annotation.relations:
+                    # 現在の画像に含まれないオブジェクトは評価から除外
+                    if gold_relation.instance_id not in instance_id_to_bounding_box:
+                        continue
                     relation_type = gold_relation.type
                     gold_bounding_box = instance_id_to_bounding_box[gold_relation.instance_id]
                     gold_box: Rectangle = gold_bounding_box.rect
