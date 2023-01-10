@@ -142,23 +142,28 @@ class Measure:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset-dir', '-d', type=Path, help='Path to the directory containing the target dataset.')
-    parser.add_argument('--gold-text-file', '-t', type=Path, help='Path to the gold KNP file.')
-    parser.add_argument('--gold-image-file', '-i', type=Path, help='Path to the gold image text annotation file.')
-    parser.add_argument('--prediction-file', '-p', type=Path, help='Path to the prediction file.')
+    parser.add_argument('--gold-knp-dir', '-k', type=Path, help='Path to the gold KNP directory.')
+    parser.add_argument('--gold-image-dir', '-i', type=Path, help='Path to the gold image text annotation file.')
+    parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction directory.')
+    parser.add_argument('--scenario-ids', type=str, nargs='*', help='List of scenario ids.')
     args = parser.parse_args()
 
-    dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath('info.json').read_text())
-    gold_document = Document.from_knp(args.gold_text_file.read_text())
-    image_text_annotation = ImageTextAnnotation.from_json(args.gold_image_file.read_text())
-    prediction = PhraseGroundingResult.from_json(args.prediction_file.read_text())
+    for scenario_id in args.scenario_ids:
 
-    evaluator = MMRefEvaluator(
-        dataset_info,
-        gold_document,
-        image_text_annotation,
-    )
-    # print(evaluator.eval_textual_reference(utterance, document))
-    print(evaluator.eval_visual_reference(prediction))
+        dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
+        gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
+        image_text_annotation = ImageTextAnnotation.from_json(
+            args.gold_image_dir.joinpath(f'{scenario_id}.json').read_text()
+        )
+        prediction = PhraseGroundingResult.from_json(args.prediction_dir.joinpath(f'{scenario_id}.json').read_text())
+
+        evaluator = MMRefEvaluator(
+            dataset_info,
+            gold_document,
+            image_text_annotation,
+        )
+        # print(evaluator.eval_textual_reference(utterance, document))
+        print(evaluator.eval_visual_reference(prediction))
 
 
 if __name__ == '__main__':
