@@ -81,7 +81,11 @@ class MMRefEvaluator:
                         if pred_bounding_box.confidence < self.confidence_threshold:
                             continue
                         pred_box: Rectangle = pred_bounding_box.rect
-                        gold_bounding_boxes = [instance_id_to_bounding_box[rel.instance_id] for rel in gold_relations]
+                        gold_bounding_boxes = [
+                            instance_id_to_bounding_box[rel.instance_id]
+                            for rel in gold_relations
+                            if rel.instance_id in instance_id_to_bounding_box
+                        ]
                         tp_gold_bounding_boxes = [
                             bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
                         ]
