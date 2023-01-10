@@ -133,10 +133,10 @@ def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> MD
     pred_boxes: torch.Tensor = outputs['pred_boxes'].cpu()  # (b, cand, 4)
     tokenized: BatchEncoding = memory_cache['tokenized']
 
-    # keep only predictions with 0.5+ confidence
+    # keep only predictions with 0.0+ confidence
     # -1: no text
     probs: torch.Tensor = 1 - pred_logits.softmax(dim=2)[0, :, -1]  # (cand)
-    keep: torch.Tensor = probs >= 0.5  # (cand)
+    keep: torch.Tensor = probs >= 0.0  # (cand)
 
     # convert boxes from [0; 1] to image scales
     bboxes_scaled = rescale_bboxes(pred_boxes[0, keep], im.size)  # (kept, 4)
