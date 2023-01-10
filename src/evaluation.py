@@ -33,16 +33,17 @@ class MMRefEvaluator:
         for utterance, utterance_annotation, utterance_result in zip(
             self.dataset_info.utterances, self.utterance_annotations, result.utterances
         ):
-            document = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
-            assert document.text == utterance_annotation.text
-            for image_id, base_phrase in itertools.product(utterance.image_ids, document.base_phrases):
+            base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+            assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text
+            for image_id, (base_phrase, phrase_annotation) in itertools.product(
+                utterance.image_ids, zip(base_phrases, utterance_annotation.phrases)
+            ):
                 # 対応する gold と system の BB を取得して比較
                 sid = base_phrase.sentence.sid
                 image_annotation: ImageAnnotation = self.image_id_to_annotation[image_id]
                 instance_id_to_bounding_box: dict[str, BoundingBox] = {
                     bb.instance_id: bb for bb in image_annotation.bounding_boxes
                 }
-                phrase_annotation = utterance_annotation.phrases[base_phrase.global_index]
                 assert phrase_annotation.text == base_phrase.text
                 pred_phrases: list[PhraseResult] = list(
                     filter(
