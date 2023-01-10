@@ -39,6 +39,7 @@ def main(cfg: DictConfig) -> None:
     dataset_dir = Path(cfg.dataset_dir)
     gold_knp_file = Path(cfg.gold_knp_file)  # TODO: remove gold tags just in case
     prediction_dir = Path(cfg.prediction_dir)
+    prediction_dir.mkdir(exist_ok=True)
 
     dataset_info = DatasetInfo.from_json(dataset_dir.joinpath('info.json').read_text())
 
