@@ -25,7 +25,7 @@ class MMRefEvaluator:
     def eval_textual_reference(self, result: PhraseGroundingResult) -> dict:
         raise NotImplementedError
 
-    def eval_visual_reference(self, result: PhraseGroundingResult) -> dict:
+    def eval_visual_reference(self, result: PhraseGroundingResult, topk: int = -1) -> dict:
         result_dict = {}
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
@@ -64,9 +64,13 @@ class MMRefEvaluator:
                     assert len(rel_pred_phrases) in (0, 1)
                     if len(rel_pred_phrases) == 1:
                         pred_phrase = rel_pred_phrases[0]
-                        pred_boxes = [
-                            bb.rect for bb in pred_phrase.bounding_boxes if bb.confidence >= self.confidence_threshold
-                        ]
+                        bounding_boxes = sorted(pred_phrase.bounding_boxes, key=lambda bb: bb.confidence, reverse=True)
+                        if topk == -1:
+                            pred_boxes = [
+                                bb.rect for bb in bounding_boxes if bb.confidence >= self.confidence_threshold
+                            ]
+                        else:
+                            pred_boxes = [bb.rect for bb in bounding_boxes[:topk]]
                         if any(box_iou(gold_box, pred_box) >= self.iou_threshold for pred_box in pred_boxes):
                             result_dict[key] = 'tp'
                         else:
@@ -146,6 +150,7 @@ def main():
     parser.add_argument('--gold-image-dir', '-i', type=Path, help='Path to the gold image text annotation file.')
     parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction directory.')
     parser.add_argument('--scenario-ids', type=str, nargs='*', help='List of scenario ids.')
+    parser.add_argument('--recall-topk', '--topk', type=int, default=-1, help='For calculating Recall@k.')
     args = parser.parse_args()
 
     for scenario_id in args.scenario_ids:
@@ -163,7 +168,7 @@ def main():
             image_text_annotation,
         )
         # print(evaluator.eval_textual_reference(utterance, document))
-        print(evaluator.eval_visual_reference(prediction))
+        print(evaluator.eval_visual_reference(prediction, topk=args.recall_topk))
 
 
 if __name__ == '__main__':
