@@ -1,8 +1,11 @@
 import argparse
 import itertools
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import polars as pl
 from rhoknp import Document
 
 from prediction_writer import PhraseGroundingResult, PhraseResult
@@ -26,7 +29,8 @@ class MMRefEvaluator:
         raise NotImplementedError
 
     def eval_visual_reference(self, result: PhraseGroundingResult, topk: int = -1) -> dict:
-        result_dict = {}
+        recall_tracker = RatioTracker()
+        precision_tracker = RatioTracker()
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
         assert len(self.dataset_info.utterances) == len(self.utterance_annotations) == len(result.utterances)
@@ -72,11 +76,11 @@ class MMRefEvaluator:
                         else:
                             pred_boxes = [bb.rect for bb in bounding_boxes[:topk]]
                         if any(box_iou(gold_box, pred_box) >= self.iou_threshold for pred_box in pred_boxes):
-                            result_dict[key] = 'tp'
+                            recall_tracker.add_positive(key[3])
                         else:
-                            result_dict[key] = 'fn'
+                            recall_tracker.add_negative(key[3])
                     else:
-                        result_dict[key] = 'fn'
+                        recall_tracker.add_negative(key[3])
 
                 # precision
                 for pred_phrase in pred_phrases:
@@ -96,19 +100,32 @@ class MMRefEvaluator:
                         ]
                         for tp_gold_bounding_box in tp_gold_bounding_boxes:
                             key = (image_id, sid, base_phrase.index, relation_type, tp_gold_bounding_box.instance_id)
-                            assert result_dict[key] == 'tp'
+                            precision_tracker.add_positive(key[3])
                         if len(tp_gold_bounding_boxes) == 0:
                             key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}')
-                            result_dict[key] = 'fp'
-        eval_result = {}
+                            precision_tracker.add_negative(key[3])
+        eval_result: dict[str, dict[str, int]] = {}
         for rel in ('ガ', 'ヲ', 'ニ', 'ノ', '='):
-            vs = [v for k, v in result_dict.items() if k[3] == rel]
-            tp = vs.count('tp')
-            fn = vs.count('fn')
-            fp = vs.count('fp')
-            measure = Measure(correct=tp, denom_gold=tp + fn, denom_pred=tp + fp)
-            eval_result[rel] = measure
+            eval_result[rel] = {
+                'recall_pos': recall_tracker.positive[rel],
+                'recall_total': recall_tracker.total[rel],
+                'precision_pos': precision_tracker.positive[rel],
+                'precision_total': precision_tracker.total[rel],
+            }
         return eval_result
+
+
+class RatioTracker:
+    def __init__(self):
+        self.total: dict[Any, int] = defaultdict(int)
+        self.positive: dict[Any, int] = defaultdict(int)
+
+    def add_positive(self, category: Any):
+        self.total[category] += 1
+        self.positive[category] += 1
+
+    def add_negative(self, category: Any):
+        self.total[category] += 1
 
 
 @dataclass
@@ -153,8 +170,8 @@ def main():
     parser.add_argument('--recall-topk', '--topk', type=int, default=-1, help='For calculating Recall@k.')
     args = parser.parse_args()
 
+    results = []
     for scenario_id in args.scenario_ids:
-
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
         gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
         image_text_annotation = ImageTextAnnotation.from_json(
@@ -168,7 +185,29 @@ def main():
             image_text_annotation,
         )
         # print(evaluator.eval_textual_reference(utterance, document))
-        print(evaluator.eval_visual_reference(prediction, topk=args.recall_topk))
+        for rel, measure in evaluator.eval_visual_reference(prediction, topk=args.recall_topk).items():
+            result = {'scenario_id': scenario_id, 'rel': rel}
+            result.update(measure)
+            results.append(result)
+    df = pl.DataFrame(results)
+    # df.drop_in_place('scenario_id')
+    df = df.filter(df['rel'] == '=')
+    df_sum = df.groupby('rel', maintain_order=True).sum()
+    # df = pl.concat([df, df_sum])
+    df = df.with_columns(
+        [
+            (df['recall_pos'] / df['recall_total']).alias('recall'),
+            (df['precision_pos'] / df['precision_total']).alias('precision'),
+        ],
+    )
+    df_sum = df_sum.with_columns(
+        [
+            (df_sum['recall_pos'] / df_sum['recall_total']).alias('recall'),
+            (df_sum['precision_pos'] / df_sum['precision_total']).alias('precision'),
+        ]
+    )
+    print(df)
+    print(df_sum)
 
 
 if __name__ == '__main__':
