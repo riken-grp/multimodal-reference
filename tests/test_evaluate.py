@@ -3,7 +3,7 @@ from pathlib import Path
 from rhoknp import Document
 
 from evaluation import Measure, MMRefEvaluator
-from prediction_writer import PhraseGroundingResult
+from prediction_writer import PhraseGroundingPrediction
 from utils.image import ImageTextAnnotation
 from utils.util import DatasetInfo
 
@@ -44,7 +44,7 @@ def test_evaluate(fixture_data_dir: Path):
         image_text_annotation,
     )
 
-    prediction = PhraseGroundingResult.from_json(evaluate_dir.joinpath('prediction.json').read_text())
+    prediction = PhraseGroundingPrediction.from_json(evaluate_dir.joinpath('prediction.json').read_text())
 
     result: dict[str, Measure] = evaluator.eval_visual_reference(prediction)
     # assert result['ガ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}

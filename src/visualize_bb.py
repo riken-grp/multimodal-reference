@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image, ImageFile
 from rhoknp import BasePhrase, Document, Sentence
 
-from prediction_writer import PhraseGroundingResult, PhraseResult
+from prediction_writer import PhraseGroundingPrediction, PhrasePrediction
 from utils.image import ImageAnnotation, ImageTextAnnotation, PhraseAnnotation
 from utils.util import DatasetInfo
 
@@ -52,7 +52,7 @@ def plot_results(
     image: ImageFile,
     image_annotation: ImageAnnotation,
     phrase_annotations: list[PhraseAnnotation],
-    phrase_predictions: list[PhraseResult],
+    phrase_predictions: list[PhrasePrediction],
     base_phrases: list[BasePhrase],
     export_dir: Path,
     topk: int = 1,
@@ -129,7 +129,7 @@ def main():
     image_text_annotation = ImageTextAnnotation.from_json(
         args.image_annotation_dir.joinpath(f'{scenario_id}.json').read_text()
     )
-    prediction = PhraseGroundingResult.from_json(args.prediction_dir.joinpath(f'{scenario_id}.json').read_text())
+    prediction = PhraseGroundingPrediction.from_json(args.prediction_dir.joinpath(f'{scenario_id}.json').read_text())
     dataset_dir = args.dataset_dir / scenario_id
     utterance_annotations = image_text_annotation.utterances
     image_id_to_annotation = {
@@ -145,7 +145,7 @@ def main():
         for image_id in utterance.image_ids:
             image_annotation = image_id_to_annotation[image_id]
             image = Image.open(dataset_dir / f'images/{image_annotation.image_id}.png')
-            pred_phrases: list[PhraseResult] = list(
+            pred_phrases: list[PhrasePrediction] = list(
                 filter(
                     lambda p: p.image.id == image_id and (p.sid, p.index) in base_phrase_keys,
                     utterance_result.phrases,

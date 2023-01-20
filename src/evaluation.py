@@ -8,7 +8,7 @@ from typing import Any
 import polars as pl
 from rhoknp import Document
 
-from prediction_writer import PhraseGroundingResult, PhraseResult
+from prediction_writer import PhraseGroundingPrediction, PhrasePrediction
 from utils.image import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.util import DatasetInfo, Rectangle, box_iou
 
@@ -25,10 +25,10 @@ class MMRefEvaluator:
         self.confidence_threshold = 0.9
         self.iou_threshold = 0.5
 
-    def eval_textual_reference(self, result: PhraseGroundingResult) -> dict:
+    def eval_textual_reference(self, result: PhraseGroundingPrediction) -> dict:
         raise NotImplementedError
 
-    def eval_visual_reference(self, result: PhraseGroundingResult, topk: int = -1) -> dict:
+    def eval_visual_reference(self, result: PhraseGroundingPrediction, topk: int = -1) -> dict:
         recall_tracker = RatioTracker()
         precision_tracker = RatioTracker()
         # utterance ごとに評価
@@ -49,7 +49,7 @@ class MMRefEvaluator:
                     bb.instance_id: bb for bb in image_annotation.bounding_boxes
                 }
                 assert phrase_annotation.text == base_phrase.text
-                pred_phrases: list[PhraseResult] = list(
+                pred_phrases: list[PhrasePrediction] = list(
                     filter(
                         lambda p: p.image.id == image_id and p.sid == sid and p.index == base_phrase.index,
                         utterance_result.phrases,
@@ -177,7 +177,9 @@ def main():
         image_text_annotation = ImageTextAnnotation.from_json(
             args.gold_image_dir.joinpath(f'{scenario_id}.json').read_text()
         )
-        prediction = PhraseGroundingResult.from_json(args.prediction_dir.joinpath(f'{scenario_id}.json').read_text())
+        prediction = PhraseGroundingPrediction.from_json(
+            args.prediction_dir.joinpath(f'{scenario_id}.json').read_text()
+        )
 
         evaluator = MMRefEvaluator(
             dataset_info,

@@ -13,7 +13,7 @@ from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
 
 
 @dataclass
-class PhraseResult(CamelCaseDataClassJsonMixin):
+class PhrasePrediction(CamelCaseDataClassJsonMixin):
     sid: str
     index: int
     text: str
@@ -23,14 +23,14 @@ class PhraseResult(CamelCaseDataClassJsonMixin):
 
 
 @dataclass
-class UtteranceResult(CamelCaseDataClassJsonMixin):
-    phrases: list[PhraseResult]
+class UtterancePrediction(CamelCaseDataClassJsonMixin):
+    phrases: list[PhrasePrediction]
 
 
 @dataclass
-class PhraseGroundingResult(CamelCaseDataClassJsonMixin):
+class PhraseGroundingPrediction(CamelCaseDataClassJsonMixin):
     scenario_id: str
-    utterances: list[UtteranceResult]
+    utterances: list[UtterancePrediction]
 
 
 @hydra.main(version_base=None, config_path="../configs")
@@ -69,16 +69,16 @@ def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:
 
 def run_mdetr(
     cfg: DictConfig, dataset_info: DatasetInfo, dataset_dir: Path, document: Document
-) -> PhraseGroundingResult:
-    utterance_results: list[UtteranceResult] = []
+) -> PhraseGroundingPrediction:
+    utterance_results: list[UtterancePrediction] = []
     sid2sentence = {sentence.sid: sentence for sentence in document.sentences}
     for utterance in dataset_info.utterances:
-        all_phrases: list[PhraseResult] = []
+        all_phrases: list[PhrasePrediction] = []
         corresponding_images = [image for image in dataset_info.images if image.id in utterance.image_ids]
         caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
         for image in corresponding_images:
-            phrases: list[PhraseResult] = [
-                PhraseResult(
+            phrases: list[PhrasePrediction] = [
+                PhrasePrediction(
                     sid=base_phrase.sentence.sid,
                     index=base_phrase.index,
                     text=base_phrase.text,
@@ -98,9 +98,9 @@ def run_mdetr(
                     if prob >= 0.1:
                         phrase.bounding_boxes.append(bounding_box)
             all_phrases.extend(filter(lambda p: p.bounding_boxes, phrases))
-        utterance_results.append(UtteranceResult(phrases=all_phrases))
+        utterance_results.append(UtterancePrediction(phrases=all_phrases))
 
-    return PhraseGroundingResult(scenario_id=dataset_info.scenario_id, utterances=utterance_results)
+    return PhraseGroundingPrediction(scenario_id=dataset_info.scenario_id, utterances=utterance_results)
 
 
 if __name__ == '__main__':
