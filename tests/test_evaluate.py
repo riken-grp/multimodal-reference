@@ -2,7 +2,7 @@ from pathlib import Path
 
 from rhoknp import Document
 
-from evaluation import Measure, MMRefEvaluator
+from evaluation import MMRefEvaluator
 from prediction_writer import PhraseGroundingPrediction
 from utils.image import ImageTextAnnotation
 from utils.util import DatasetInfo
@@ -22,7 +22,7 @@ tp/denom_gold/denom_pred
 風船: 0/1/3
 ギター: 0/1/0
 段ボール: 0/0/5
-箱: 2/2/2 (2/2/5 のうち pred 側の重複は除去)
+箱: 2/2/2 (2/2/5 のうち pred 側の重複は除去 ( = gold bb 1つにつき pred bb 1つ))
 
 2枚目=格
 風船: 0/1/3
@@ -46,9 +46,9 @@ def test_evaluate(fixture_data_dir: Path):
 
     prediction = PhraseGroundingPrediction.from_json(evaluate_dir.joinpath('prediction.json').read_text())
 
-    result: dict[str, Measure] = evaluator.eval_visual_reference(prediction)
+    result: dict[str, dict] = evaluator.eval_visual_reference(prediction)
     # assert result['ガ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
     # assert result['ヲ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
     # assert result['ニ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
     # assert result['ノ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
-    assert (result['='].correct, result['='].denom_gold, result['='].denom_pred) == (4, 9, 25)
+    assert (result['=']['recall_pos'], result['=']['recall_total'], result['=']['precision_pos']) == (4, 9, 25)
