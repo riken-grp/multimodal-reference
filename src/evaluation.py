@@ -8,7 +8,7 @@ from typing import Any
 import polars as pl
 from rhoknp import Document
 
-from prediction_writer import PhraseGroundingPrediction, PhrasePrediction
+from prediction_writer import PhraseGroundingPrediction
 from utils.image import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.util import DatasetInfo, Rectangle, box_iou
 
@@ -28,19 +28,19 @@ class MMRefEvaluator:
     def eval_textual_reference(self, result: PhraseGroundingPrediction) -> dict:
         raise NotImplementedError
 
-    def eval_visual_reference(self, result: PhraseGroundingPrediction, topk: int = -1) -> dict:
+    def eval_visual_reference(self, prediction: PhraseGroundingPrediction, topk: int = -1) -> dict:
         recall_tracker = RatioTracker()
         precision_tracker = RatioTracker()
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
-        assert len(self.dataset_info.utterances) == len(self.utterance_annotations) == len(result.utterances)
-        for utterance, utterance_annotation, utterance_result in zip(
-            self.dataset_info.utterances, self.utterance_annotations, result.utterances
+        assert len(self.dataset_info.utterances) == len(self.utterance_annotations) == len(prediction.utterances)
+        for utterance, utterance_annotation, utterance_prediction in zip(
+            self.dataset_info.utterances, self.utterance_annotations, prediction.utterances
         ):
             base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
-            assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text
-            for image_id, (base_phrase, phrase_annotation) in itertools.product(
-                utterance.image_ids, zip(base_phrases, utterance_annotation.phrases)
+            assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text == utterance_prediction.text
+            for image_id, (base_phrase, phrase_annotation, phrase_prediction) in itertools.product(
+                utterance.image_ids, zip(base_phrases, utterance_annotation.phrases, utterance_prediction.phrases)
             ):
                 # 対応する gold と system の BB を取得して比較
                 sid = base_phrase.sentence.sid
@@ -48,13 +48,8 @@ class MMRefEvaluator:
                 instance_id_to_bounding_box: dict[str, BoundingBox] = {
                     bb.instance_id: bb for bb in image_annotation.bounding_boxes
                 }
-                assert phrase_annotation.text == base_phrase.text
-                pred_phrases: list[PhrasePrediction] = list(
-                    filter(
-                        lambda p: p.image.id == image_id and p.sid == sid and p.index == base_phrase.index,
-                        utterance_result.phrases,
-                    )
-                )
+                assert base_phrase.text == phrase_annotation.text == phrase_prediction.text
+                pred_relations = [rel for rel in phrase_prediction.relations if rel.image_id == image_id]
                 # recall
                 for gold_relation in phrase_annotation.relations:
                     # 現在の画像に含まれないオブジェクトは評価から除外
@@ -64,11 +59,9 @@ class MMRefEvaluator:
                     gold_bounding_box = instance_id_to_bounding_box[gold_relation.instance_id]
                     gold_box: Rectangle = gold_bounding_box.rect
                     key = (image_id, sid, base_phrase.index, relation_type, gold_bounding_box.instance_id)
-                    rel_pred_phrases = [p for p in pred_phrases if p.relation == relation_type]
-                    assert len(rel_pred_phrases) in (0, 1)
-                    if len(rel_pred_phrases) == 1:
-                        pred_phrase = rel_pred_phrases[0]
-                        bounding_boxes = sorted(pred_phrase.bounding_boxes, key=lambda bb: bb.confidence, reverse=True)
+                    pred_bounding_boxes = [rel.bounding_box for rel in pred_relations if rel.type == relation_type]
+                    if len(pred_bounding_boxes) > 0:
+                        bounding_boxes = sorted(pred_bounding_boxes, key=lambda bb: bb.confidence, reverse=True)
                         if topk == -1:
                             pred_boxes = [
                                 bb.rect for bb in bounding_boxes if bb.confidence >= self.confidence_threshold
@@ -83,27 +76,26 @@ class MMRefEvaluator:
                         recall_tracker.add_negative(key[3])
 
                 # precision
-                for pred_phrase in pred_phrases:
-                    relation_type = pred_phrase.relation
+                for idx, pred_relation in enumerate(pred_relations):
+                    relation_type = pred_relation.type
                     gold_relations = [rel for rel in phrase_annotation.relations if rel.type == relation_type]
-                    for idx, pred_bounding_box in enumerate(pred_phrase.bounding_boxes):
-                        if pred_bounding_box.confidence < self.confidence_threshold:
-                            continue
-                        pred_box: Rectangle = pred_bounding_box.rect
-                        gold_bounding_boxes = [
-                            instance_id_to_bounding_box[rel.instance_id]
-                            for rel in gold_relations
-                            if rel.instance_id in instance_id_to_bounding_box
-                        ]
-                        tp_gold_bounding_boxes = [
-                            bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
-                        ]
-                        for tp_gold_bounding_box in tp_gold_bounding_boxes:
-                            key = (image_id, sid, base_phrase.index, relation_type, tp_gold_bounding_box.instance_id)
-                            precision_tracker.add_positive(key[3])
-                        if len(tp_gold_bounding_boxes) == 0:
-                            key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}')
-                            precision_tracker.add_negative(key[3])
+                    if pred_relation.bounding_box.confidence < self.confidence_threshold:
+                        continue
+                    pred_box: Rectangle = pred_relation.bounding_box.rect
+                    gold_bounding_boxes = [
+                        instance_id_to_bounding_box[rel.instance_id]
+                        for rel in gold_relations
+                        if rel.instance_id in instance_id_to_bounding_box
+                    ]
+                    tp_gold_bounding_boxes = [
+                        bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
+                    ]
+                    for tp_gold_bounding_box in tp_gold_bounding_boxes:
+                        key = (image_id, sid, base_phrase.index, relation_type, tp_gold_bounding_box.instance_id)
+                        precision_tracker.add_positive(key[3])
+                    if len(tp_gold_bounding_boxes) == 0:
+                        key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}')
+                        precision_tracker.add_negative(key[3])
         eval_result: dict[str, dict[str, int]] = {}
         for rel in ('ガ', 'ヲ', 'ニ', 'ノ', '='):
             eval_result[rel] = {

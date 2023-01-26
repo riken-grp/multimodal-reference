@@ -12,30 +12,37 @@ from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
 from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
 
 
+@dataclass(frozen=True, eq=True)
+class RelationPrediction(CamelCaseDataClassJsonMixin):
+    type: str  # ガ, ヲ, ニ, ノ, =, etc...
+    image_id: str
+    bounding_box: BoundingBox
+
+
 @dataclass
 class PhrasePrediction(CamelCaseDataClassJsonMixin):
     sid: str
     index: int
     text: str
-    relation: str
-    image: ImageInfo
-    bounding_boxes: list[BoundingBox]
+    relations: list[RelationPrediction]
 
 
 @dataclass
 class UtterancePrediction(CamelCaseDataClassJsonMixin):
+    text: str
+    sids: list[str]
     phrases: list[PhrasePrediction]
 
 
 @dataclass
 class PhraseGroundingPrediction(CamelCaseDataClassJsonMixin):
     scenario_id: str
+    images: list[ImageInfo]
     utterances: list[UtterancePrediction]
 
 
 @hydra.main(version_base=None, config_path="../configs")
 def main(cfg: DictConfig) -> None:
-
     dataset_dir = Path(cfg.dataset_dir)
     gold_knp_file = Path(cfg.gold_knp_file)  # TODO: remove gold tags just in case
     prediction_dir = Path(cfg.prediction_dir)
@@ -47,8 +54,9 @@ def main(cfg: DictConfig) -> None:
     prediction_dir.joinpath(f'{parsed_document.did}.knp').write_text(parsed_document.to_knp())
 
     phrase_grounding_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
+    mm_reference_prediction = relax_prediction(phrase_grounding_result, parsed_document)
     prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(
-        phrase_grounding_result.to_json(ensure_ascii=False, indent=2)
+        mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
 
 
@@ -73,21 +81,18 @@ def run_mdetr(
     utterance_results: list[UtterancePrediction] = []
     sid2sentence = {sentence.sid: sentence for sentence in document.sentences}
     for utterance in dataset_info.utterances:
-        all_phrases: list[PhrasePrediction] = []
         corresponding_images = [image for image in dataset_info.images if image.id in utterance.image_ids]
         caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
+        phrases: list[PhrasePrediction] = [
+            PhrasePrediction(
+                sid=base_phrase.sentence.sid,
+                index=base_phrase.index,
+                text=base_phrase.text,
+                relations=[],
+            )
+            for base_phrase in caption.base_phrases
+        ]
         for image in corresponding_images:
-            phrases: list[PhrasePrediction] = [
-                PhrasePrediction(
-                    sid=base_phrase.sentence.sid,
-                    index=base_phrase.index,
-                    text=base_phrase.text,
-                    relation='=',
-                    image=image,
-                    bounding_boxes=[],
-                )
-                for base_phrase in caption.base_phrases
-            ]
             image_file: ImageFile = Image.open(dataset_dir.joinpath(image.path))
             prediction: MDETRPrediction = predict_mdetr(cfg.checkpoint, image_file, caption)
             for bounding_box in prediction.bounding_boxes:
@@ -96,11 +101,65 @@ def run_mdetr(
                     assert ''.join(words) == phrase.text == base_phrase.text
                     prob = max(bounding_box.word_probs[m.global_index] for m in base_phrase.morphemes)
                     if prob >= 0.1:
-                        phrase.bounding_boxes.append(bounding_box)
-            all_phrases.extend(filter(lambda p: p.bounding_boxes, phrases))
-        utterance_results.append(UtterancePrediction(phrases=all_phrases))
+                        phrase.relations.append(
+                            RelationPrediction(type='=', image_id=image.id, bounding_box=bounding_box)
+                        )
+        utterance_results.append(UtterancePrediction(text=caption.text, sids=utterance.sids, phrases=phrases))
 
-    return PhraseGroundingPrediction(scenario_id=dataset_info.scenario_id, utterances=utterance_results)
+    return PhraseGroundingPrediction(
+        scenario_id=dataset_info.scenario_id, images=dataset_info.images, utterances=utterance_results
+    )
+
+
+def relax_prediction(
+    phrase_grounding_result: PhraseGroundingPrediction,
+    parsed_document: Document,
+) -> PhraseGroundingPrediction:
+    sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
+    for utterance in phrase_grounding_result.utterances:
+        document = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
+        for base_phrase in document.base_phrases:
+            assert base_phrase.pas is not None
+            # for case, arguments in base_phrase.pas.get_all_arguments():
+            #     for argument in arguments:
+            #         pass
+    return phrase_grounding_result
+
+
+# def relax_annotation(document: Document, eid2relations: dict[int, set[Phrase2ObjectRelation]]) -> None:
+#     for base_phrase in document.base_phrases:
+#         current_relations: set[Phrase2ObjectRelation] = set()  # 述語を中心とした関係の集合
+#         for entity in base_phrase.entities:
+#             current_relations.update(eid2relations[entity.eid])
+#         new_relations: set[Phrase2ObjectRelation] = set()
+#         pas = base_phrase.pas
+#         assert pas is not None
+#         for case, arguments in pas.get_all_arguments(relax=False).items():
+#             argument_entity_ids: set[int] = set()
+#             for argument in arguments:
+#                 if isinstance(argument, EndophoraArgument):
+#                     argument_entity_ids.update({entity.eid for entity in argument.base_phrase.entities})
+#                 elif isinstance(argument, ExophoraArgument):
+#                     argument_entity_ids.add(argument.eid)
+#                 else:
+#                     raise AssertionError
+#             new_relations.update(
+#                 {
+#                     Phrase2ObjectRelation(type=case, instance_id=rel.instance_id)
+#                     for argument_eid in argument_entity_ids
+#                     for rel in eid2relations[argument_eid]
+#                     if rel.type == '='
+#                 }
+#             )
+#             # 格が一致する述語を中心とした関係の集合
+#             # relation の対象は argument_entity_ids と一致
+#             case_relations: set[Phrase2ObjectRelation] = {rel for rel in current_relations if rel.type == case}
+#             for argument_eid in argument_entity_ids:
+#                 eid2relations[argument_eid].update(
+#                     {Phrase2ObjectRelation(type='=', instance_id=rel.instance_id) for rel in case_relations}
+#                 )
+#         for entity in base_phrase.entities:
+#             eid2relations[entity.eid].update(new_relations)
 
 
 if __name__ == '__main__':
