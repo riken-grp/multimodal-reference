@@ -7,12 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision.transforms as tt
-from dataclasses_json import LetterCase, dataclass_json
 from PIL import Image, ImageFile
 from rhoknp import Document, Jumanpp
 from transformers import BatchEncoding, CharSpan
 
-from utils.util import Rectangle
+from utils.util import CamelCaseDataClassJsonMixin, Rectangle
 
 sys.path.append('./mdetr')
 from hubconf import _make_detr  # noqa: E402
@@ -20,18 +19,19 @@ from hubconf import _make_detr  # noqa: E402
 torch.set_grad_enabled(False)
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(frozen=True)
-class BoundingBox:
+@dataclass(frozen=True, eq=True)
+class BoundingBox(CamelCaseDataClassJsonMixin):
     rect: Rectangle
     class_name: str
     confidence: float
     word_probs: list[float]
 
+    def __hash__(self):
+        return hash((self.rect, self.class_name, self.confidence, tuple(self.word_probs)))
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
+
 @dataclass(frozen=True)
-class MDETRPrediction:
+class MDETRPrediction(CamelCaseDataClassJsonMixin):
     bounding_boxes: list[BoundingBox]
     words: list[str]
 

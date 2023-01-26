@@ -35,8 +35,8 @@ class DatasetInfo(CamelCaseDataClassJsonMixin):
     images: list[ImageInfo]
 
 
-@dataclass(frozen=True)
-class Rectangle(DataClassJsonMixin):
+@dataclass(frozen=True, eq=True)
+class Rectangle(CamelCaseDataClassJsonMixin):
     x1: int
     y1: int
     x2: int
