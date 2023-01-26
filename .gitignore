@@ -165,6 +165,7 @@ result
 /*.json
 
 *.png
+!tests/data/**/*.png
 outputs/*
 configs/*
 !configs/example.yaml
