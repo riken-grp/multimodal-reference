@@ -1,5 +1,7 @@
+import copy
 import subprocess
 import tempfile
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,6 +9,7 @@ import hydra
 from omegaconf import DictConfig
 from PIL import Image, ImageFile
 from rhoknp import Document
+from rhoknp.cohesion import EndophoraArgument, ExophoraArgument
 
 from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
 from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
@@ -115,51 +118,71 @@ def relax_prediction(
     phrase_grounding_result: PhraseGroundingPrediction,
     parsed_document: Document,
 ) -> PhraseGroundingPrediction:
+    eid2relations: dict[int, set[RelationPrediction]] = defaultdict(set)
+
+    # convert phrase grounding result to eid2relations
     sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
     for utterance in phrase_grounding_result.utterances:
         document = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
-        for base_phrase in document.base_phrases:
-            assert base_phrase.pas is not None
-            # for case, arguments in base_phrase.pas.get_all_arguments():
-            #     for argument in arguments:
-            #         pass
+        for base_phrase, phrase_prediction in zip(document.base_phrases, utterance.phrases):
+            for entity in base_phrase.entities:
+                eid2relations[entity.eid].update(phrase_prediction.relations)
+
+    # relax annotation until convergence
+    eid2relations_prev: dict[int, set[RelationPrediction]] = {}
+    while eid2relations != eid2relations_prev:
+        eid2relations_prev = copy.deepcopy(eid2relations)
+        relax_annotation(parsed_document, eid2relations)
+
+    # convert eid2relations to phrase grounding result
+    for utterance in phrase_grounding_result.utterances:
+        document = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
+        for base_phrase, phrase_prediction in zip(document.base_phrases, utterance.phrases):
+            relations = set(phrase_prediction.relations)
+            for entity in base_phrase.entities:
+                relations.update(eid2relations[entity.eid])
+            phrase_prediction.relations = list(relations)
+
     return phrase_grounding_result
 
 
-# def relax_annotation(document: Document, eid2relations: dict[int, set[Phrase2ObjectRelation]]) -> None:
-#     for base_phrase in document.base_phrases:
-#         current_relations: set[Phrase2ObjectRelation] = set()  # 述語を中心とした関係の集合
-#         for entity in base_phrase.entities:
-#             current_relations.update(eid2relations[entity.eid])
-#         new_relations: set[Phrase2ObjectRelation] = set()
-#         pas = base_phrase.pas
-#         assert pas is not None
-#         for case, arguments in pas.get_all_arguments(relax=False).items():
-#             argument_entity_ids: set[int] = set()
-#             for argument in arguments:
-#                 if isinstance(argument, EndophoraArgument):
-#                     argument_entity_ids.update({entity.eid for entity in argument.base_phrase.entities})
-#                 elif isinstance(argument, ExophoraArgument):
-#                     argument_entity_ids.add(argument.eid)
-#                 else:
-#                     raise AssertionError
-#             new_relations.update(
-#                 {
-#                     Phrase2ObjectRelation(type=case, instance_id=rel.instance_id)
-#                     for argument_eid in argument_entity_ids
-#                     for rel in eid2relations[argument_eid]
-#                     if rel.type == '='
-#                 }
-#             )
-#             # 格が一致する述語を中心とした関係の集合
-#             # relation の対象は argument_entity_ids と一致
-#             case_relations: set[Phrase2ObjectRelation] = {rel for rel in current_relations if rel.type == case}
-#             for argument_eid in argument_entity_ids:
-#                 eid2relations[argument_eid].update(
-#                     {Phrase2ObjectRelation(type='=', instance_id=rel.instance_id) for rel in case_relations}
-#                 )
-#         for entity in base_phrase.entities:
-#             eid2relations[entity.eid].update(new_relations)
+def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPrediction]]) -> None:
+    for base_phrase in document.base_phrases:
+        current_relations: set[RelationPrediction] = set()  # 述語を中心とした関係の集合
+        for entity in base_phrase.entities:
+            current_relations.update(eid2relations[entity.eid])
+        new_relations: set[RelationPrediction] = set([])
+        pas = base_phrase.pas
+        assert pas is not None
+        for case, arguments in pas.get_all_arguments(relax=False).items():
+            argument_entity_ids: set[int] = set()
+            for argument in arguments:
+                if isinstance(argument, EndophoraArgument):
+                    argument_entity_ids.update({entity.eid for entity in argument.base_phrase.entities})
+                elif isinstance(argument, ExophoraArgument):
+                    argument_entity_ids.add(argument.eid)
+                else:
+                    raise AssertionError
+            new_relations.update(
+                {
+                    RelationPrediction(type=case, image_id=rel.image_id, bounding_box=rel.bounding_box)
+                    for argument_eid in argument_entity_ids
+                    for rel in eid2relations[argument_eid]
+                    if rel.type == '='
+                }
+            )
+            # 格が一致する述語を中心とした関係の集合
+            # relation の対象は argument_entity_ids と一致
+            case_relations: set[RelationPrediction] = {rel for rel in current_relations if rel.type == case}
+            for argument_eid in argument_entity_ids:
+                eid2relations[argument_eid].update(
+                    {
+                        RelationPrediction(type='=', image_id=rel.image_id, bounding_box=rel.bounding_box)
+                        for rel in case_relations
+                    }
+                )
+        for entity in base_phrase.entities:
+            eid2relations[entity.eid].update(new_relations)
 
 
 if __name__ == '__main__':
