@@ -9,7 +9,7 @@ import hydra
 from omegaconf import DictConfig
 from PIL import Image, ImageFile
 from rhoknp import Document
-from rhoknp.cohesion import EndophoraArgument, ExophoraArgument
+from rhoknp.cohesion import EndophoraArgument, ExophoraArgument, RelMode, RelTagList
 
 from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
 from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
@@ -55,9 +55,15 @@ def main(cfg: DictConfig) -> None:
 
     parsed_document: Document = run_cohesion(cfg.cohesion, gold_knp_file)
     prediction_dir.joinpath(f'{parsed_document.did}.knp').write_text(parsed_document.to_knp())
+    # parsed_document: Document = Document.from_knp(prediction_dir.joinpath(f'{dataset_info.scenario_id}.knp').read_text())
 
-    phrase_grounding_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
-    mm_reference_prediction = relax_prediction(phrase_grounding_result, parsed_document)
+    # perform phrase grounding with MDETR
+    mdetr_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
+    prediction_dir.joinpath('mdetr.json').write_text(mdetr_result.to_json(ensure_ascii=False, indent=2))
+    # mdetr_result = PhraseGroundingPrediction.from_json(prediction_dir.joinpath('mdetr.json').read_text())
+
+    parsed_document = preprocess_document(parsed_document)
+    mm_reference_prediction = relax_prediction(mdetr_result, parsed_document)
     prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
@@ -123,8 +129,8 @@ def relax_prediction(
     # convert phrase grounding result to eid2relations
     sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
     for utterance in phrase_grounding_result.utterances:
-        document = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
-        for base_phrase, phrase_prediction in zip(document.base_phrases, utterance.phrases):
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
             for entity in base_phrase.entities:
                 eid2relations[entity.eid].update(phrase_prediction.relations)
 
@@ -183,6 +189,29 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
                 )
         for entity in base_phrase.entities:
             eid2relations[entity.eid].update(new_relations)
+
+
+def preprocess_document(document: Document) -> Document:
+    for base_phrase in document.base_phrases:
+        filtered = RelTagList()
+        for rel_tag in base_phrase.rel_tags:
+            # exclude '?' rel tags for simplicity
+            if rel_tag.mode is RelMode.AMBIGUOUS and rel_tag.target != 'なし':
+                continue
+            # exclude coreference relations of 用言
+            # e.g., ...を[運んで]。[それ]が終わったら...
+            if rel_tag.type == '=' and rel_tag.sid is not None:
+                if target_base_phrase := base_phrase._get_target_base_phrase(rel_tag):
+                    if ('体言' in base_phrase.features and '体言' in target_base_phrase.features) is False:
+                        continue
+            filtered.append(rel_tag)
+        base_phrase.rel_tags = filtered
+    document = document.reparse()
+    # ensure that each base phrase has at least one entity
+    for base_phrase in document.base_phrases:
+        if len(base_phrase.entities) == 0:
+            base_phrase.add_entity(document.entity_manager.get_or_create_entity())
+    return document
 
 
 if __name__ == '__main__':
