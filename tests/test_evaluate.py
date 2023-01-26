@@ -32,6 +32,17 @@ tp/denom_gold/denom_pred
 
 3枚目=格
 上: 0/1/0
+
+1枚目ガ格
+ある: -/1/-
+ある: -/2/-
+
+2枚目ガ格
+ある: -/1/-
+ある: -/2/-
+
+3枚目=格
+移動した: -/1/-
 """
 
 
@@ -47,7 +58,7 @@ def test_evaluate(fixture_data_dir: Path):
     prediction = PhraseGroundingPrediction.from_json(evaluate_dir.joinpath('prediction.json').read_text())
 
     result: dict[str, dict] = evaluator.eval_visual_reference(prediction)
-    # assert result['ガ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
+    assert (result['ガ']['recall_pos'], result['ガ']['recall_total'], result['ガ']['precision_pos']) == (-1, 7, -1)
     # assert result['ヲ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
     # assert result['ニ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
     # assert result['ノ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
