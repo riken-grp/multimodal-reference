@@ -53,14 +53,20 @@ def main(cfg: DictConfig) -> None:
 
     dataset_info = DatasetInfo.from_json(dataset_dir.joinpath('info.json').read_text())
 
-    parsed_document: Document = run_cohesion(cfg.cohesion, gold_knp_file)
-    prediction_dir.joinpath(f'{parsed_document.did}.knp').write_text(parsed_document.to_knp())
-    # parsed_document: Document = Document.from_knp(prediction_dir.joinpath(f'{dataset_info.scenario_id}.knp').read_text())
+    pred_knp_file = prediction_dir / f'{dataset_info.scenario_id}.knp'
+    if pred_knp_file.exists():
+        parsed_document = Document.from_knp(pred_knp_file.read_text())
+    else:
+        parsed_document = run_cohesion(cfg.cohesion, gold_knp_file)
+        pred_knp_file.write_text(parsed_document.to_knp())
 
     # perform phrase grounding with MDETR
-    mdetr_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
-    prediction_dir.joinpath('mdetr.json').write_text(mdetr_result.to_json(ensure_ascii=False, indent=2))
-    # mdetr_result = PhraseGroundingPrediction.from_json(prediction_dir.joinpath('mdetr.json').read_text())
+    phrase_grounding_file = prediction_dir / 'mdetr.json'
+    if phrase_grounding_file.exists():
+        mdetr_result = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
+    else:
+        mdetr_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
+        phrase_grounding_file.write_text(mdetr_result.to_json(ensure_ascii=False, indent=2))
 
     parsed_document = preprocess_document(parsed_document)
     mm_reference_prediction = relax_prediction(mdetr_result, parsed_document)
@@ -142,8 +148,8 @@ def relax_prediction(
 
     # convert eid2relations to phrase grounding result
     for utterance in phrase_grounding_result.utterances:
-        document = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
-        for base_phrase, phrase_prediction in zip(document.base_phrases, utterance.phrases):
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
             relations = set(phrase_prediction.relations)
             for entity in base_phrase.entities:
                 relations.update(eid2relations[entity.eid])
