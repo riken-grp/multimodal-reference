@@ -20,37 +20,59 @@ from utils.util import DatasetInfo
 <<<上>>>に<<<移動した>>>。
 
 tp/recall_total/precision_total
-001 =格
-風船: 0/1/3
-ギター: 0/1/0
-段ボール: 0/0/5
-箱: 2/2/2 (2/2/5 のうち pred 側の重複は除去 ( = gold bb 1つにつき pred bb 1つ))
-total: 2/4/13
+- =格
+  - 001
+    風船: 0/1/3
+    ギター: 0/1/0
+    段ボール: 0/0/5
+    箱: 2/2/2 (2/2/5 のうち pred 側の重複は除去 ( = gold bb 1つにつき pred bb 1つ))
+    total: 2/4/13
 
-002 =格
-風船: 0/1/3
-ギター: 0/1/0
-段ボール: 0/0/8
-箱: 2/2/4 (2/2/8 のうち pred 側の重複は除去)
-total: 2/4/19
+  - 002
+    風船: 0/1/3
+    ギター: 0/1/0
+    段ボール: 0/0/8
+    箱: 2/2/4 (2/2/8 のうち pred 側の重複は除去)
+    total: 2/4/19
 
-003 =格
-上: 0/1/0
-total: 0/1/0
+  - 003
+    上: 0/1/0
+    total: 0/1/0
 
-001 ガ格
-ある: 0/1/0
-ある: 2/2/5
-total: 2/3/5
+- ガ格
+  - 001
+    ある: 0/1/0
+    ある: 2/2/5
+    total: 2/3/5
 
-002 ガ格
-ある: 0/1/0
-ある: 2/2/8
-total: 2/3/8
+  - 002
+    ある: 0/1/0
+    ある: 2/2/8
+    total: 2/3/8
 
-003 ガ格
-移動した: 0/1/0
-total: 0/1/0
+  - 003
+    移動した: 0/1/0
+    total: 0/1/0
+
+- ヲ格
+  - 003
+    移動した: 0/0/0
+    total: 0/0/0
+
+- ノ格
+  - 001
+    下: 0/1/3
+    隣: 0/1/3
+    total: 0/2/6
+
+  - 002
+    下: 0/1/3
+    隣: 0/1/3
+    total: 0/2/6
+
+  - 003
+    上: 0/1/0
+    total: 0/1/0
 """
 
 
@@ -69,7 +91,7 @@ def test_evaluate(fixture_data_dir: Path):
 
     result: dict[str, dict] = evaluator.eval_visual_reference(prediction)
     assert (result['ガ']['recall_pos'], result['ガ']['recall_total'], result['ガ']['precision_total']) == (4, 7, 13)
-    # assert result['ヲ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
-    # assert result['ニ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
-    # assert result['ノ'] == {'precision': 1.0, 'recall': 1.0, 'f1': 1.0}
+    assert (result['ヲ']['recall_pos'], result['ヲ']['recall_total'], result['ヲ']['precision_total']) == (0, 0, 0)
+    assert (result['ニ']['recall_pos'], result['ニ']['recall_total'], result['ニ']['precision_total']) == (0, 1, 0)
+    assert (result['ノ']['recall_pos'], result['ノ']['recall_total'], result['ノ']['precision_total']) == (0, 4, 12)
     assert (result['=']['recall_pos'], result['=']['recall_total'], result['=']['precision_total']) == (4, 9, 32)
