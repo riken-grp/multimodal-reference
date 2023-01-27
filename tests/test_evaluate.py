@@ -48,14 +48,16 @@ tp/denom_gold/denom_pred
 
 def test_evaluate(fixture_data_dir: Path):
     evaluate_dir = fixture_data_dir / 'evaluate'
-    image_text_annotation = ImageTextAnnotation.from_json(evaluate_dir.joinpath('converted.json').read_text())
+    image_text_annotation = ImageTextAnnotation.from_json(evaluate_dir.joinpath('gold.json').read_text())
     evaluator = MMRefEvaluator(
         DatasetInfo.from_json(evaluate_dir.joinpath('info.json').read_text()),
-        Document.from_knp(evaluate_dir.joinpath('reference.knp').read_text()),
+        Document.from_knp(evaluate_dir.joinpath('gold.knp').read_text()),
         image_text_annotation,
     )
 
-    prediction = PhraseGroundingPrediction.from_json(evaluate_dir.joinpath('prediction.json').read_text())
+    prediction = PhraseGroundingPrediction.from_json(
+        evaluate_dir.joinpath(f'{image_text_annotation.scenario_id}.json').read_text()
+    )
 
     result: dict[str, dict] = evaluator.eval_visual_reference(prediction)
     assert (result['ガ']['recall_pos'], result['ガ']['recall_total'], result['ガ']['precision_pos']) == (-1, 7, -1)
