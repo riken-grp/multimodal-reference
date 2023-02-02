@@ -134,14 +134,24 @@ def main():
     scenario_id = args.scenario_id
     export_dir = args.export_dir / scenario_id
     export_dir.mkdir(parents=True, exist_ok=True)
-
     dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
+    image_dir = args.dataset_dir / scenario_id / 'images'
     gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
     image_text_annotation = ImageTextAnnotation.from_json(
         args.image_annotation_dir.joinpath(f'{scenario_id}.json').read_text()
     )
     prediction = PhraseGroundingPrediction.from_json(args.prediction_dir.joinpath(f'{scenario_id}.json').read_text())
-    dataset_dir = args.dataset_dir / scenario_id
+    visualize(export_dir, dataset_info, gold_document, image_dir, image_text_annotation, prediction)
+
+
+def visualize(
+    export_dir: Path,
+    dataset_info: DatasetInfo,
+    gold_document: Document,
+    image_dir: Path,
+    image_text_annotation: ImageTextAnnotation,
+    prediction: PhraseGroundingPrediction,
+) -> None:
     utterance_annotations = image_text_annotation.utterances
     image_id_to_annotation = {
         image_annotation.image_id: image_annotation for image_annotation in image_text_annotation.images
@@ -154,7 +164,7 @@ def main():
         assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text
         for image_id in utterance.image_ids:
             image_annotation = image_id_to_annotation[image_id]
-            image = Image.open(dataset_dir / f'images/{image_annotation.image_id}.png')
+            image = Image.open(image_dir / f'{image_annotation.image_id}.png')
             plot_results(
                 image,
                 image_annotation,
