@@ -97,7 +97,7 @@ class MMRefEvaluator:
                         key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}')
                         precision_tracker.add_negative(key[3])
         eval_result: dict[str, dict[str, int]] = {}
-        for rel in ('ガ', 'ヲ', 'ニ', 'ノ', '='):
+        for rel in ('ガ', 'ヲ', 'ニ', 'ガ２', 'ノ', '='):
             eval_result[rel] = {
                 'recall_pos': recall_tracker.positive[rel],
                 'recall_total': recall_tracker.total[rel],
@@ -184,8 +184,7 @@ def main():
             result.update(measure)
             results.append(result)
     df = pl.DataFrame(results)
-    # df.drop_in_place('scenario_id')
-    df = df.filter(df['rel'] == '=')
+    df.drop_in_place('scenario_id')
     df_sum = df.groupby('rel', maintain_order=True).sum()
     # df = pl.concat([df, df_sum])
     df = df.with_columns(
