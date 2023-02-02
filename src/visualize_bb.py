@@ -55,6 +55,7 @@ def plot_results(
     phrase_predictions: list[PhrasePrediction],
     base_phrases: list[BasePhrase],
     export_dir: Path,
+    plots: list[str],
     topk: int = -1,
     confidence_threshold: float = 0.0,
 ) -> None:
@@ -62,9 +63,11 @@ def plot_results(
     np_image = np.array(image)
     ax = plt.gca()
 
-    draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk)
+    if 'pred' in plots:
+        draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk)
 
-    draw_annotation(ax, base_phrases, image_annotation, phrase_annotations)
+    if 'gold' in plots:
+        draw_annotation(ax, base_phrases, image_annotation, phrase_annotations)
 
     plt.imshow(np_image)
     plt.axis('off')
@@ -137,6 +140,7 @@ def parse_args():
     parser.add_argument('--export-dir', '-e', type=Path, help='Path to the directory where tagged images are exported')
     parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction file.')
     parser.add_argument('--scenario-ids', '--ids', type=str, nargs='*', help='List of scenario ids.')
+    parser.add_argument('--plots', type=str, nargs='*', choices=["gold", "pred"], help='Plotting target.')
     return parser.parse_args()
 
 
@@ -154,7 +158,7 @@ def main():
         prediction = PhraseGroundingPrediction.from_json(
             args.prediction_dir.joinpath(f'{scenario_id}.json').read_text()
         )
-        visualize(export_dir, dataset_info, gold_document, image_dir, image_text_annotation, prediction)
+        visualize(export_dir, dataset_info, gold_document, image_dir, image_text_annotation, prediction, args.plots)
 
 
 def visualize(
@@ -164,6 +168,7 @@ def visualize(
     image_dir: Path,
     image_text_annotation: ImageTextAnnotation,
     prediction: PhraseGroundingPrediction,
+    plots: list[str],
 ) -> None:
     utterance_annotations = image_text_annotation.utterances
     image_id_to_annotation = {
@@ -186,6 +191,7 @@ def visualize(
                 base_phrases,
                 export_dir,
                 confidence_threshold=0.9,
+                plots=plots,
             )
 
 
