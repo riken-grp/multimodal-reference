@@ -1,4 +1,5 @@
 import argparse
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -100,9 +101,7 @@ def plot_results(image: ImageFile, prediction: MDETRPrediction) -> None:
     plt.show()
 
 
-def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> MDETRPrediction:
-    # model, postprocessor = torch.hub.load('ashkamath/mdetr:main', 'mdetr_efficientnetB5', pretrained=True,
-    #                                       return_postprocessor=True)
+def predict_mdetr(checkpoint_path: Path, images: list[ImageFile], caption: Document) -> list[MDETRPrediction]:
     model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
     checkpoint = torch.load(str(checkpoint_path), map_location='cpu')
     model.load_state_dict(checkpoint['model'])
@@ -115,58 +114,66 @@ def predict_mdetr(checkpoint_path: Path, im: ImageFile, caption: Document) -> MD
     # standard PyTorch mean-std input image normalization
     transform = tt.Compose([tt.Resize(800), tt.ToTensor(), tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
-    # mean-std normalize the input image (batch-size: 1)
-    img: torch.Tensor = transform(im).unsqueeze(0)  # (1, ch, H, W)
-    if torch.cuda.is_available():
-        img = img.cuda()
+    predictions: list[MDETRPrediction] = []
+    batch_size = 6
+    image_size = images[0].size
+    assert all(im.size == image_size for im in images)
+    # mean-std normalize the input image
+    image_tensors = [transform(im) for im in images]
+    for batch_idx in range(math.ceil(len(images) / batch_size)):
+        img = torch.stack(image_tensors[batch_idx * batch_size : (batch_idx + 1) * batch_size], dim=0)  # (b, ch, H, W)
+        if torch.cuda.is_available():
+            img = img.cuda()
 
-    # propagate through the model
-    memory_cache = model(img, [caption.text], encode_and_save=True)
-    # dict keys: 'pred_logits', 'pred_boxes', 'proj_queries', 'proj_tokens', 'tokenized'
-    # pred_logits: (1, cand, seq)
-    # pred_boxes: (1, cand, 4)
-    # proj_queries: (1, cand, 64)
-    # proj_tokens: (1, 28, 64)
-    # tokenized: BatchEncoding
-    outputs: dict = model(img, [caption.text], encode_and_save=False, memory_cache=memory_cache)
-    pred_logits: torch.Tensor = outputs['pred_logits'].cpu()  # (b, cand, seq)
-    pred_boxes: torch.Tensor = outputs['pred_boxes'].cpu()  # (b, cand, 4)
-    tokenized: BatchEncoding = memory_cache['tokenized']
+        # propagate through the model
+        memory_cache = model(img, [caption.text], encode_and_save=True)
+        # dict keys: 'pred_logits', 'pred_boxes', 'proj_queries', 'proj_tokens', 'tokenized'
+        # pred_logits: (b, cand, seq)
+        # pred_boxes: (b, cand, 4)
+        # proj_queries: (b, cand, 64)
+        # proj_tokens: (b, 28, 64)
+        # tokenized: BatchEncoding
+        outputs: dict = model(img, [caption.text], encode_and_save=False, memory_cache=memory_cache)
+        pred_logits: torch.Tensor = outputs['pred_logits'].cpu()  # (b, cand, seq)
+        pred_boxes: torch.Tensor = outputs['pred_boxes'].cpu()  # (b, cand, 4)
+        tokenized: BatchEncoding = memory_cache['tokenized']
 
-    # keep only predictions with 0.0+ confidence
-    # -1: no text
-    probs: torch.Tensor = 1 - pred_logits.softmax(dim=2)[0, :, -1]  # (cand)
-    keep: torch.Tensor = probs >= 0.0  # (cand)
+        for pred_logit, pred_box in zip(pred_logits, pred_boxes):  # (cand, seq), (cand, 4)
+            # keep only predictions with 0.0+ confidence
+            # -1: no text
+            probs: torch.Tensor = 1 - pred_logit.softmax(dim=-1)[:, -1]  # (cand)
+            keep: torch.Tensor = probs >= 0.0  # (cand)
 
-    # convert boxes from [0; 1] to image scales
-    bboxes_scaled = rescale_bboxes(pred_boxes[0, keep], im.size)  # (kept, 4)
+            # convert boxes from [0; 1] to image scales
+            bboxes_scaled = rescale_bboxes(pred_boxes[0, keep], image_size)  # (kept, 4)
 
-    bounding_boxes = []
-    for prob, bbox, token_probs in zip(
-        probs[keep].tolist(), bboxes_scaled.tolist(), pred_logits[0, keep].softmax(dim=-1)
-    ):
-        char_probs: list[float] = [0] * len(caption.text)
-        for pos, token_prob in enumerate(token_probs.tolist()):
-            try:
-                span: CharSpan = tokenized.token_to_chars(0, pos)
-            except TypeError:
-                continue
-            char_probs[span.start : span.end] = [token_prob] * (span.end - span.start)
-        word_probs: list[float] = []
-        char_span = CharSpan(0, 0)
-        for morpheme in caption.morphemes:
-            char_span = CharSpan(char_span.end, char_span.end + len(morpheme.text))
-            word_probs.append(np.max(char_probs[char_span.start : char_span.end]).item())
+            bounding_boxes = []
+            for prob, bbox, token_probs in zip(
+                probs[keep].tolist(), bboxes_scaled.tolist(), pred_logits[0, keep].softmax(dim=-1)
+            ):
+                char_probs: list[float] = [0] * len(caption.text)
+                for pos, token_prob in enumerate(token_probs.tolist()):
+                    try:
+                        span: CharSpan = tokenized.token_to_chars(0, pos)
+                    except TypeError:
+                        continue
+                    char_probs[span.start : span.end] = [token_prob] * (span.end - span.start)
+                word_probs: list[float] = []
+                char_span = CharSpan(0, 0)
+                for morpheme in caption.morphemes:
+                    char_span = CharSpan(char_span.end, char_span.end + len(morpheme.text))
+                    word_probs.append(np.max(char_probs[char_span.start : char_span.end]).item())
 
-        bounding_boxes.append(
-            BoundingBox(
-                rect=Rectangle.from_xyxy(*bbox),
-                class_name="",
-                confidence=prob,
-                word_probs=word_probs,
-            )
-        )
-    return MDETRPrediction(bounding_boxes, [m.text for m in caption.morphemes])
+                bounding_boxes.append(
+                    BoundingBox(
+                        rect=Rectangle.from_xyxy(*bbox),
+                        class_name="",
+                        confidence=prob,
+                        word_probs=word_probs,
+                    )
+                )
+                predictions.append(MDETRPrediction(bounding_boxes, [m.text for m in caption.morphemes]))
+    return predictions
 
 
 def main():

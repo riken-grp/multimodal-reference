@@ -108,9 +108,9 @@ def run_mdetr(
             )
             for base_phrase in caption.base_phrases
         ]
-        for image in corresponding_images:
-            image_file: ImageFile = Image.open(dataset_dir.joinpath(image.path))
-            prediction: MDETRPrediction = predict_mdetr(cfg.checkpoint, image_file, caption)
+        image_files: list[ImageFile] = [Image.open(dataset_dir.joinpath(image.path)) for image in corresponding_images]
+        predictions: list[MDETRPrediction] = predict_mdetr(cfg.checkpoint, image_files, caption)
+        for image, prediction in zip(corresponding_images, predictions):
             for bounding_box in prediction.bounding_boxes:
                 for phrase, base_phrase in zip(phrases, caption.base_phrases):
                     words = [prediction.words[m.global_index] for m in base_phrase.morphemes]
