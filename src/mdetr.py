@@ -104,6 +104,8 @@ def plot_results(image: ImageFile, prediction: MDETRPrediction) -> None:
 def predict_mdetr(
     checkpoint_path: Path, images: list[ImageFile], caption: Document, batch_size: int = 32
 ) -> list[MDETRPrediction]:
+    if len(images) == 0:
+        return []
     model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
     checkpoint = torch.load(str(checkpoint_path), map_location='cpu')
     model.load_state_dict(checkpoint['model'])
