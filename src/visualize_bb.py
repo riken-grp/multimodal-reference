@@ -61,8 +61,42 @@ def plot_results(
     plt.figure(figsize=(16, 10))
     np_image = np.array(image)
     ax = plt.gca()
-    colors = COLORS * 100
 
+    draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk)
+
+    draw_annotation(ax, base_phrases, image_annotation, phrase_annotations)
+
+    plt.imshow(np_image)
+    plt.axis('off')
+    plt.savefig(str(export_dir / f'{image_annotation.image_id}.png'))
+    # plt.show()
+
+
+def draw_annotation(ax, base_phrases, image_annotation, phrase_annotations):
+    for bounding_box in image_annotation.bounding_boxes:
+        rect = bounding_box.rect
+        labels = []
+        for phrase_annotation in phrase_annotations:
+            base_phrase = next(filter(lambda bp: bp.text == phrase_annotation.text, base_phrases))
+            for relation in phrase_annotation.relations:
+                if relation.instance_id == bounding_box.instance_id:
+                    labels.append(f'{relation.type}_{get_core_expression(base_phrase)[1]}')
+        if not labels:
+            continue
+        # color = colors.pop()
+        ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=GOLD_COLOR, linewidth=3))
+        ax.text(
+            rect.x1,
+            rect.y1,
+            ', '.join(labels),
+            fontsize=24,
+            bbox=dict(facecolor=GOLD_COLOR, alpha=0.8),
+            fontname='Hiragino Maru Gothic Pro',
+        )
+
+
+def draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk):
+    colors = COLORS * 100
     for phrase_prediction in phrase_predictions:
         relation_types: set[str] = {relation.type for relation in phrase_prediction.relations}
         for relation_type in relation_types:
@@ -93,32 +127,6 @@ def plot_results(
                     bbox=dict(facecolor=color, alpha=0.8),
                     fontname='Hiragino Maru Gothic Pro',
                 )
-
-    for bounding_box in image_annotation.bounding_boxes:
-        rect = bounding_box.rect
-        labels = []
-        for phrase_annotation in phrase_annotations:
-            base_phrase = next(filter(lambda bp: bp.text == phrase_annotation.text, base_phrases))
-            for relation in phrase_annotation.relations:
-                if relation.instance_id == bounding_box.instance_id:
-                    labels.append(f'{relation.type}_{get_core_expression(base_phrase)[1]}')
-        if not labels:
-            continue
-        # color = colors.pop()
-        ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=GOLD_COLOR, linewidth=3))
-        ax.text(
-            rect.x1,
-            rect.y1,
-            ', '.join(labels),
-            fontsize=24,
-            bbox=dict(facecolor=GOLD_COLOR, alpha=0.8),
-            fontname='Hiragino Maru Gothic Pro',
-        )
-
-    plt.imshow(np_image)
-    plt.axis('off')
-    plt.savefig(str(export_dir / f'{image_annotation.image_id}.png'))
-    # plt.show()
 
 
 def parse_args():
