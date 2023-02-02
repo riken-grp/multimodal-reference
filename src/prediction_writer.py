@@ -61,7 +61,8 @@ def main(cfg: DictConfig) -> None:
         pred_knp_file.write_text(parsed_document.to_knp())
 
     # perform phrase grounding with MDETR
-    phrase_grounding_file = prediction_dir / 'mdetr.json'
+    phrase_grounding_file = prediction_dir / 'mdetr' / f'{parsed_document.did}.json'
+    phrase_grounding_file.parent.mkdir(exist_ok=True)
     if phrase_grounding_file.exists():
         mdetr_result = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
     else:
