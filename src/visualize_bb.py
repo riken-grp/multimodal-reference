@@ -121,27 +121,32 @@ def plot_results(
     # plt.show()
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset-dir', '-d', type=Path, help='Path to the directory containing the target dataset.')
     parser.add_argument('--gold-knp-dir', '-k', type=Path, help='Path to the gold KNP directory.')
     parser.add_argument('--image-annotation-dir', '-i', type=Path, help='Path to the gold image text annotation file.')
     parser.add_argument('--export-dir', '-e', type=Path, help='Path to the directory where tagged images are exported')
     parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction file.')
-    parser.add_argument('--scenario-id', '--id', type=Path, help='Scenario id.')
-    args = parser.parse_args()
+    parser.add_argument('--scenario-ids', '--ids', type=str, nargs='*', help='List of scenario ids.')
+    return parser.parse_args()
 
-    scenario_id = args.scenario_id
-    export_dir = args.export_dir / scenario_id
-    export_dir.mkdir(parents=True, exist_ok=True)
-    dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
-    image_dir = args.dataset_dir / scenario_id / 'images'
-    gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
-    image_text_annotation = ImageTextAnnotation.from_json(
-        args.image_annotation_dir.joinpath(f'{scenario_id}.json').read_text()
-    )
-    prediction = PhraseGroundingPrediction.from_json(args.prediction_dir.joinpath(f'{scenario_id}.json').read_text())
-    visualize(export_dir, dataset_info, gold_document, image_dir, image_text_annotation, prediction)
+
+def main():
+    args = parse_args()
+    for scenario_id in args.scenario_ids:
+        export_dir = args.export_dir / scenario_id
+        export_dir.mkdir(parents=True, exist_ok=True)
+        dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
+        image_dir = args.dataset_dir / scenario_id / 'images'
+        gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
+        image_text_annotation = ImageTextAnnotation.from_json(
+            args.image_annotation_dir.joinpath(f'{scenario_id}.json').read_text()
+        )
+        prediction = PhraseGroundingPrediction.from_json(
+            args.prediction_dir.joinpath(f'{scenario_id}.json').read_text()
+        )
+        visualize(export_dir, dataset_info, gold_document, image_dir, image_text_annotation, prediction)
 
 
 def visualize(
