@@ -30,7 +30,7 @@ class Scorer:
         exophora_referents (List[ExophoraReferent]): 評価の対象とする外界照応の照応先 (rhoknp.cohesion.ExophoraReferentType を参照)
         bridging (bool): 橋渡し照応の評価を行うかどうか (default: False)
         coreference (bool): 共参照の評価を行うかどうか (default: False)
-        pas_target (str): 述語項構造解析において述語として扱う対象 ('pred': 用言, 'noun': 体言, 'all': 両方, '': 述語なし (default: pred))
+        pas (bool): 述語項構造解析の評価を行うかどうか (default: False)
 
     Attributes:
         cases (List[str]): 評価の対象となる格
@@ -39,7 +39,7 @@ class Scorer:
         did2document_gold (Dict[str, Document]): 文書IDから正解文書を引くための辞書
         bridging (bool): 橋渡し照応の評価を行うかどうか
         coreference (bool): 共参照の評価を行うかどうか
-        pas_target (str): 述語項構造解析において述語として扱う対象
+        pas (bool): 述語項構造解析の評価を行うかどうか
         comp_result (Dict[tuple, str]): 正解と予測を比較した結果を格納するための辞書
         sub_scorers (List[SubScorer]): 文書ごとの評価を行うオブジェクトのリスト
         exophora_referents (List[ExophoraReferent]): 評価の対象とする外界照応の照応先
@@ -62,17 +62,17 @@ class Scorer:
         exophora_referents: List[ExophoraReferent],
         bridging: bool = False,
         coreference: bool = False,
-        pas_target: str = "pred",
+        pas: bool = False,
     ) -> None:
         # long document may have been ignored
         assert set(doc.doc_id for doc in documents_pred) <= set(doc.doc_id for doc in documents_gold)
-        self.cases: List[str] = target_cases if pas_target != "" else []
+        self.cases: List[str] = target_cases if pas else []
         self.doc_ids: List[str] = [doc.doc_id for doc in documents_pred]
         self.did2document_pred: Dict[str, Document] = {doc.doc_id: doc for doc in documents_pred}
         self.did2document_gold: Dict[str, Document] = {doc.doc_id: doc for doc in documents_gold}
         self.bridging: bool = bridging
         self.coreference: bool = coreference
-        self.pas_target: str = pas_target
+        self.pas: bool = pas
 
         self.comp_result: Dict[tuple, str] = {}
         self.sub_scorers: List[SubScorer] = []
@@ -95,7 +95,7 @@ class Scorer:
                 bridging=self.bridging,
                 coreference=self.coreference,
                 exophora_referents=self.exophora_referents,
-                pas_target=self.pas_target,
+                pas=self.pas,
             )
             all_results.append(sub_scorer.run())
             self.sub_scorers.append(sub_scorer)
@@ -110,10 +110,10 @@ class SubScorer:
         document_pred (Document): システム予測文書
         document_gold (Document): 正解文書
         cases (List[str]): 評価の対象とする格
-        bridging (bool): 橋渡し照応の評価を行うかどうか (default: False)
-        coreference (bool): 共参照の評価を行うかどうか (default: False)
+        bridging (bool): 橋渡し照応の評価を行うかどうか
+        coreference (bool): 共参照の評価を行うかどうか
         exophora_referents (List[ExophoraReferent]): 評価の対象とする外界照応の照応先
-        pas_target (str): 述語項構造解析において述語として扱う対象
+        pas (bool): 述語項構造解析の評価を行うかどうか
 
     Attributes:
         doc_id (str): 対象の文書ID
@@ -140,15 +140,15 @@ class SubScorer:
         cases: List[str],
         bridging: bool,
         coreference: bool,
+        pas: bool,
         exophora_referents: List[ExophoraReferent],
-        pas_target: str,
     ):
         assert document_pred.doc_id == document_gold.doc_id
         self.doc_id: str = document_gold.doc_id
         self.document_pred: Document = document_pred
         self.document_gold: Document = document_gold
         self.cases: List[str] = cases
-        self.pas: bool = pas_target != ""
+        self.pas: bool = pas
         self.bridging: bool = bridging
         self.coreference: bool = coreference
         self.comp_result: Dict[tuple, str] = {}
@@ -644,7 +644,7 @@ def main():
         exophora_referents=[ExophoraReferent(e) for e in args.exophors.split(",")],
         coreference=args.coreference,
         bridging=args.bridging,
-        pas_target=args.pas_target,
+        pas=bool(args.pas_target),
     )
     result = scorer.run()
     if args.result_csv:

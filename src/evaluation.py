@@ -2,13 +2,18 @@ import argparse
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import reduce
+from operator import add
 from pathlib import Path
 from typing import Any
 
 import polars as pl
 from rhoknp import Document
+from rhoknp.cohesion import ExophoraReferent
 
+from cohesion_scorer import ScoreResult, SubScorer
 from prediction_writer import PhraseGroundingPrediction
+from utils.constants import CASES
 from utils.image import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.util import DatasetInfo, Rectangle, box_iou
 
@@ -25,8 +30,18 @@ class MMRefEvaluator:
         self.confidence_threshold = 0.9
         self.iou_threshold = 0.5
 
-    def eval_textual_reference(self, result: PhraseGroundingPrediction) -> dict:
-        raise NotImplementedError
+    def eval_textual_reference(self, pred_document: Document) -> ScoreResult:
+        scorer = SubScorer(
+            pred_document,
+            self.gold_document,
+            cases=list(CASES),
+            bridging=True,
+            coreference=True,
+            exophora_referents=[ExophoraReferent(e) for e in '著者 読者 不特定:人 不特定:物'.split()],
+            pas=True,
+        )
+        score_result = scorer.run()
+        return score_result
 
     def eval_visual_reference(self, prediction: PhraseGroundingPrediction, topk: int = -1) -> dict:
         recall_tracker = RatioTracker()
@@ -162,10 +177,12 @@ def main():
     parser.add_argument('--recall-topk', '--topk', type=int, default=-1, help='For calculating Recall@k.')
     args = parser.parse_args()
 
+    textual_results: list[ScoreResult] = []
     results = []
     for scenario_id in args.scenario_ids:
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
         gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
+        pred_document = Document.from_knp(args.prediction_dir.joinpath(f'{scenario_id}.knp').read_text())
         image_text_annotation = ImageTextAnnotation.from_json(
             args.gold_image_dir.joinpath(f'{scenario_id}.json').read_text()
         )
@@ -178,7 +195,7 @@ def main():
             gold_document,
             image_text_annotation,
         )
-        # print(evaluator.eval_textual_reference(utterance, document))
+        textual_results.append(evaluator.eval_textual_reference(pred_document))
         for rel, measure in evaluator.eval_visual_reference(prediction, topk=args.recall_topk).items():
             result = {'scenario_id': scenario_id, 'rel': rel}
             result.update(measure)
@@ -201,6 +218,10 @@ def main():
     )
     print(df)
     print(df_sum)
+    total_textual_result = reduce(add, textual_results)
+    print(total_textual_result.to_dict())
+    total_textual_result.export_csv('cohesion_result.csv')
+    total_textual_result.export_txt('cohesion_result.txt')
 
 
 if __name__ == '__main__':
