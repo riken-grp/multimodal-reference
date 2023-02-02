@@ -126,14 +126,14 @@ def predict_mdetr(checkpoint_path: Path, images: list[ImageFile], caption: Docum
             img = img.cuda()
 
         # propagate through the model
-        memory_cache = model(img, [caption.text], encode_and_save=True)
+        memory_cache = model(img, [caption.text] * img.size(0), encode_and_save=True)
         # dict keys: 'pred_logits', 'pred_boxes', 'proj_queries', 'proj_tokens', 'tokenized'
         # pred_logits: (b, cand, seq)
         # pred_boxes: (b, cand, 4)
         # proj_queries: (b, cand, 64)
         # proj_tokens: (b, 28, 64)
         # tokenized: BatchEncoding
-        outputs: dict = model(img, [caption.text], encode_and_save=False, memory_cache=memory_cache)
+        outputs: dict = model(img, [caption.text] * img.size(0), encode_and_save=False, memory_cache=memory_cache)
         pred_logits: torch.Tensor = outputs['pred_logits'].cpu()  # (b, cand, seq)
         pred_boxes: torch.Tensor = outputs['pred_boxes'].cpu()  # (b, cand, 4)
         tokenized: BatchEncoding = memory_cache['tokenized']
