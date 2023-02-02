@@ -69,6 +69,15 @@ def plot_results(
     if 'gold' in plots:
         draw_annotation(ax, base_phrases, image_annotation, phrase_annotations)
 
+    ax.text(
+        -10,
+        -50,
+        ''.join(bp.text for bp in base_phrases),
+        fontsize=24,
+        bbox=dict(facecolor=(1.0, 1.0, 1.0), alpha=0.8),
+        fontname='Hiragino Maru Gothic Pro',
+    )
+
     plt.imshow(np_image)
     plt.axis('off')
     plt.savefig(str(export_dir / f'{image_annotation.image_id}.png'))
