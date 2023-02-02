@@ -175,7 +175,7 @@ def predict_mdetr(
                         word_probs=word_probs,
                     )
                 )
-                predictions.append(MDETRPrediction(bounding_boxes, [m.text for m in caption.morphemes]))
+            predictions.append(MDETRPrediction(bounding_boxes, [m.text for m in caption.morphemes]))
     return predictions
 
 
