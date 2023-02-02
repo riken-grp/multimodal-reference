@@ -101,7 +101,9 @@ def plot_results(image: ImageFile, prediction: MDETRPrediction) -> None:
     plt.show()
 
 
-def predict_mdetr(checkpoint_path: Path, images: list[ImageFile], caption: Document) -> list[MDETRPrediction]:
+def predict_mdetr(
+    checkpoint_path: Path, images: list[ImageFile], caption: Document, batch_size: int = 32
+) -> list[MDETRPrediction]:
     model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
     checkpoint = torch.load(str(checkpoint_path), map_location='cpu')
     model.load_state_dict(checkpoint['model'])
@@ -115,7 +117,6 @@ def predict_mdetr(checkpoint_path: Path, images: list[ImageFile], caption: Docum
     transform = tt.Compose([tt.Resize(800), tt.ToTensor(), tt.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
     predictions: list[MDETRPrediction] = []
-    batch_size = 6
     image_size = images[0].size
     assert all(im.size == image_size for im in images)
     # mean-std normalize the input image
@@ -192,8 +193,8 @@ def main():
     # image = Image.open(web_image)
     image = Image.open(args.image_path)
 
-    prediction = predict_mdetr(args.model, image, Jumanpp().apply_to_document(args.text))
-    plot_results(image, prediction)
+    predictions = predict_mdetr(args.model, [image], Jumanpp().apply_to_document(args.text))
+    plot_results(image, predictions[0])
 
 
 if __name__ == '__main__':

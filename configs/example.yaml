@@ -9,6 +9,7 @@ cohesion:
 
 mdetr:
   checkpoint: /path/to/trained/mdetr/checkpoint
+  batch_size: 16
 
 dataset_dir: /path/to/dataset
 gold_knp_file: /path/to/gold/knp/file
