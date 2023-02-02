@@ -55,7 +55,8 @@ def plot_results(
     phrase_predictions: list[PhrasePrediction],
     base_phrases: list[BasePhrase],
     export_dir: Path,
-    topk: int = 1,
+    topk: int = -1,
+    confidence_threshold: float = 0.0,
 ) -> None:
     plt.figure(figsize=(16, 10))
     np_image = np.array(image)
@@ -63,25 +64,35 @@ def plot_results(
     colors = COLORS * 100
 
     for phrase_prediction in phrase_predictions:
-        bounding_boxes = sorted(phrase_prediction.bounding_boxes, key=lambda bb: bb.confidence, reverse=True)
-        for pred_bounding_box in bounding_boxes[:topk]:
-            rect = pred_bounding_box.rect
-            score = pred_bounding_box.confidence
-            # if score < 0.8:
-            #     continue
-            base_phrase = next(filter(lambda bp: bp.text == phrase_prediction.text, base_phrases))
-            label = f'=_{get_core_expression(base_phrase)[1]}: {score:0.2f}'
-            labels = [label]
-            color = colors.pop()
-            ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=color, linewidth=3))
-            ax.text(
-                rect.x1,
-                rect.y1,
-                ', '.join(labels),
-                fontsize=24,
-                bbox=dict(facecolor=color, alpha=0.8),
-                fontname='Hiragino Maru Gothic Pro',
-            )
+        relation_types: set[str] = {relation.type for relation in phrase_prediction.relations}
+        for relation_type in relation_types:
+            relations = [
+                r
+                for r in phrase_prediction.relations
+                if r.image_id == image_annotation.image_id
+                and r.type == relation_type
+                and r.bounding_box.confidence >= confidence_threshold
+            ]
+            sorted_relations = sorted(relations, key=lambda r: r.bounding_box.confidence, reverse=True)
+            for pred_relation in sorted_relations[:topk] if topk >= 0 else sorted_relations:
+                pred_bounding_box = pred_relation.bounding_box
+                rect = pred_bounding_box.rect
+                base_phrase = next(filter(lambda bp: bp.text == phrase_prediction.text, base_phrases))
+                label = '{type}_{text}: {score:0.2f}'.format(
+                    type=pred_relation.type,
+                    text=get_core_expression(base_phrase)[1],
+                    score=pred_bounding_box.confidence,
+                )
+                color = colors.pop()
+                ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=color, linewidth=3))
+                ax.text(
+                    rect.x1,
+                    rect.y1,
+                    label,
+                    fontsize=24,
+                    bbox=dict(facecolor=color, alpha=0.8),
+                    fontname='Hiragino Maru Gothic Pro',
+                )
 
     for bounding_box in image_annotation.bounding_boxes:
         rect = bounding_box.rect
@@ -136,22 +147,23 @@ def main():
         image_annotation.image_id: image_annotation for image_annotation in image_text_annotation.images
     }
     sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in gold_document.sentences}
-    for utterance, utterance_annotation, utterance_result in zip(
+    for utterance, utterance_annotation, utterance_prediction in zip(
         dataset_info.utterances, utterance_annotations, prediction.utterances
     ):
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
-        base_phrase_keys = [(bp.sentence.sid, bp.index) for bp in base_phrases]
         assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text
         for image_id in utterance.image_ids:
             image_annotation = image_id_to_annotation[image_id]
             image = Image.open(dataset_dir / f'images/{image_annotation.image_id}.png')
-            pred_phrases: list[PhrasePrediction] = list(
-                filter(
-                    lambda p: p.image.id == image_id and (p.sid, p.index) in base_phrase_keys,
-                    utterance_result.phrases,
-                )
+            plot_results(
+                image,
+                image_annotation,
+                utterance_annotation.phrases,
+                utterance_prediction.phrases,
+                base_phrases,
+                export_dir,
+                confidence_threshold=0.9,
             )
-            plot_results(image, image_annotation, utterance_annotation.phrases, pred_phrases, base_phrases, export_dir)
 
 
 if __name__ == '__main__':
