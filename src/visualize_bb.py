@@ -1,6 +1,7 @@
 import argparse
+from itertools import repeat
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -164,9 +165,10 @@ def main():
         image_text_annotation = ImageTextAnnotation.from_json(
             args.image_annotation_dir.joinpath(f'{scenario_id}.json').read_text()
         )
-        prediction = PhraseGroundingPrediction.from_json(
-            args.prediction_dir.joinpath(f'{scenario_id}.json').read_text()
-        )
+        if (prediction_file := args.prediction_dir.joinpath(f'{scenario_id}.json')).exists():
+            prediction = PhraseGroundingPrediction.from_json(prediction_file.read_text())
+        else:
+            prediction = None
         visualize(export_dir, dataset_info, gold_document, image_dir, image_text_annotation, prediction, args.plots)
 
 
@@ -176,7 +178,7 @@ def visualize(
     gold_document: Document,
     image_dir: Path,
     image_text_annotation: ImageTextAnnotation,
-    prediction: PhraseGroundingPrediction,
+    prediction: Optional[PhraseGroundingPrediction],
     plots: list[str],
 ) -> None:
     utterance_annotations = image_text_annotation.utterances
@@ -185,7 +187,7 @@ def visualize(
     }
     sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in gold_document.sentences}
     for utterance, utterance_annotation, utterance_prediction in zip(
-        dataset_info.utterances, utterance_annotations, prediction.utterances
+        dataset_info.utterances, utterance_annotations, prediction.utterances if prediction else repeat(None)
     ):
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
         assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text
@@ -196,7 +198,7 @@ def visualize(
                 image,
                 image_annotation,
                 utterance_annotation.phrases,
-                utterance_prediction.phrases,
+                utterance_prediction.phrases if utterance_prediction else [],
                 base_phrases,
                 export_dir,
                 confidence_threshold=0.9,
