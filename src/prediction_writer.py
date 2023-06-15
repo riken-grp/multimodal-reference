@@ -7,12 +7,11 @@ from pathlib import Path
 
 import hydra
 from omegaconf import DictConfig
-from PIL import Image, ImageFile
 from rhoknp import Document
 from rhoknp.cohesion import EndophoraArgument, ExophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
-from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
+from mdetr import BoundingBox, MDETRPrediction
 from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
 
 
@@ -87,6 +86,7 @@ def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:
                 f'input_path={input_knp_file}',
                 f'export_dir={out_dir}',
                 'num_workers=0',
+                'devices=1',
             ]
         )
         return Document.from_knp(next(Path(out_dir).glob('*.knp')).read_text())
@@ -109,8 +109,24 @@ def run_mdetr(
             )
             for base_phrase in caption.base_phrases
         ]
-        image_files: list[ImageFile] = [Image.open(dataset_dir.joinpath(image.path)) for image in corresponding_images]
-        predictions: list[MDETRPrediction] = predict_mdetr(cfg.checkpoint, image_files, caption, cfg.batch_size)
+        image_files: list[Path] = [dataset_dir.joinpath(image.path) for image in corresponding_images]
+        with tempfile.TemporaryDirectory() as out_dir:
+            caption_file = Path(out_dir).joinpath('caption.jpp')
+            caption_file.write_text(caption.to_jumanpp())
+            subprocess.run(
+                [
+                    cfg.python,
+                    f'{cfg.project_root}/run_mdetr.py',
+                    f'--model={cfg.checkpoint}',
+                    f'--caption-file={caption_file}',
+                    f'--batch-size={cfg.batch_size}',
+                    f'--export-dir={out_dir}',
+                    '--image-files',
+                ]
+                + [str(file) for file in image_files]
+            )
+            predictions = [MDETRPrediction.from_json(file.read_text()) for file in Path(out_dir).glob('*.json')]
+
         for image, prediction in zip(corresponding_images, predictions):
             for bounding_box in prediction.bounding_boxes:
                 for phrase, base_phrase in zip(phrases, caption.base_phrases):
