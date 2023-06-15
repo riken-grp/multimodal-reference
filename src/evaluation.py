@@ -1,5 +1,6 @@
 import argparse
 import itertools
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import reduce
@@ -49,13 +50,21 @@ class MMRefEvaluator:
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
         assert len(self.dataset_info.utterances) == len(self.utterance_annotations) == len(prediction.utterances)
-        for utterance, utterance_annotation, utterance_prediction in zip(
-            self.dataset_info.utterances, self.utterance_annotations, prediction.utterances
+        all_image_ids = [image.id for image in self.dataset_info.images]
+        for idx, (utterance, utterance_annotation, utterance_prediction) in enumerate(
+            zip(self.dataset_info.utterances, self.utterance_annotations, prediction.utterances)
         ):
             base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
             assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text == utterance_prediction.text
+            start_index = math.ceil(utterance.start / 1000)
+            if idx + 1 < len(self.dataset_info.utterances):
+                next_utterance = self.dataset_info.utterances[idx + 1]
+                end_index = math.ceil(next_utterance.start / 1000)
+            else:
+                end_index = len(all_image_ids)
             for image_id, (base_phrase, phrase_annotation, phrase_prediction) in itertools.product(
-                utterance.image_ids, zip(base_phrases, utterance_annotation.phrases, utterance_prediction.phrases)
+                all_image_ids[start_index:end_index],
+                zip(base_phrases, utterance_annotation.phrases, utterance_prediction.phrases),
             ):
                 # 対応する gold と system の BB を取得して比較
                 sid = base_phrase.sentence.sid
