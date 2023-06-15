@@ -10,7 +10,7 @@ tqdm = "^4.64"
 rhoknp = "~1.2.0"
 dataclasses-json = "^0.5.7"
 hydra-core = "^1.3.1"
-polars = "^0.15.14"
+polars = "^0.17.15"
 pandas = "^1.5.3"
 
 [tool.poetry.group.mdetr.dependencies]
