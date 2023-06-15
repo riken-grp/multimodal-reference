@@ -97,8 +97,15 @@ def run_mdetr(
 ) -> PhraseGroundingPrediction:
     utterance_results: list[UtterancePrediction] = []
     sid2sentence = {sentence.sid: sentence for sentence in document.sentences}
-    for utterance in dataset_info.utterances:
-        corresponding_images = [image for image in dataset_info.images if image.id in utterance.image_ids]
+    all_image_ids = [image.id for image in dataset_info.images]
+    for idx, utterance in enumerate(dataset_info.utterances):
+        start_index = all_image_ids.index(utterance.image_ids[0])
+        if idx + 1 < len(dataset_info.utterances):
+            next_utterance = dataset_info.utterances[idx + 1]
+            end_index = all_image_ids.index(next_utterance.image_ids[0])
+        else:
+            end_index = len(all_image_ids)
+        corresponding_images = dataset_info.images[start_index:end_index]
         caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
         phrases: list[PhrasePrediction] = [
             PhrasePrediction(
