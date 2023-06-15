@@ -10,6 +10,7 @@ from omegaconf import DictConfig
 from PIL import Image, ImageFile
 from rhoknp import Document
 from rhoknp.cohesion import EndophoraArgument, ExophoraArgument, RelMode, RelTagList
+from rhoknp.cohesion.coreference import EntityManager
 
 from mdetr import BoundingBox, MDETRPrediction, predict_mdetr
 from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
@@ -166,7 +167,6 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
             current_relations.update(eid2relations[entity.eid])
         new_relations: set[RelationPrediction] = set([])
         pas = base_phrase.pas
-        assert pas is not None
         for case, arguments in pas.get_all_arguments(relax=False).items():
             argument_entity_ids: set[int] = set()
             for argument in arguments:
@@ -217,7 +217,7 @@ def preprocess_document(document: Document) -> Document:
     # ensure that each base phrase has at least one entity
     for base_phrase in document.base_phrases:
         if len(base_phrase.entities) == 0:
-            base_phrase.add_entity(document.entity_manager.get_or_create_entity())
+            EntityManager.get_or_create_entity().add_mention(base_phrase)
     return document
 
 
