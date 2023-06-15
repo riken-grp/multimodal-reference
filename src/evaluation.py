@@ -13,6 +13,7 @@ from rhoknp import Document
 from rhoknp.cohesion import ExophoraReferent
 
 from cohesion_scorer import ScoreResult, SubScorer
+from mdetr import BoundingBox as BoundingBoxPrediction
 from prediction_writer import PhraseGroundingPrediction
 from utils.constants import CASES
 from utils.image import BoundingBox, ImageAnnotation, ImageTextAnnotation
@@ -82,16 +83,26 @@ class MMRefEvaluator:
                     relation_type = gold_relation.type
                     gold_bounding_box = instance_id_to_bounding_box[gold_relation.instance_id]
                     gold_box: Rectangle = gold_bounding_box.rect
-                    key = (image_id, sid, base_phrase.index, relation_type, gold_bounding_box.instance_id)
-                    pred_bounding_boxes = [rel.bounding_box for rel in pred_relations if rel.type == relation_type]
+                    key = (
+                        image_id,
+                        sid,
+                        base_phrase.index,
+                        relation_type,
+                        gold_bounding_box.instance_id,
+                        gold_bounding_box.class_name,
+                    )
+                    pred_bounding_boxes: list[BoundingBoxPrediction] = sorted(
+                        [rel.bounding_box for rel in pred_relations if rel.type == relation_type],
+                        key=lambda bb: bb.confidence,
+                        reverse=True,
+                    )
                     if len(pred_bounding_boxes) > 0:
-                        bounding_boxes = sorted(pred_bounding_boxes, key=lambda bb: bb.confidence, reverse=True)
                         if topk == -1:
                             pred_boxes = [
-                                bb.rect for bb in bounding_boxes if bb.confidence >= self.confidence_threshold
+                                bb.rect for bb in pred_bounding_boxes if bb.confidence >= self.confidence_threshold
                             ]
                         else:
-                            pred_boxes = [bb.rect for bb in bounding_boxes[:topk]]
+                            pred_boxes = [bb.rect for bb in pred_bounding_boxes[:topk]]
                         if any(box_iou(gold_box, pred_box) >= self.iou_threshold for pred_box in pred_boxes):
                             recall_tracker.add_positive(key[3])
                         else:
@@ -115,10 +126,17 @@ class MMRefEvaluator:
                         bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
                     ]
                     for tp_gold_bounding_box in tp_gold_bounding_boxes:
-                        key = (image_id, sid, base_phrase.index, relation_type, tp_gold_bounding_box.instance_id)
+                        key = (
+                            image_id,
+                            sid,
+                            base_phrase.index,
+                            relation_type,
+                            tp_gold_bounding_box.instance_id,
+                            tp_gold_bounding_box.class_name,
+                        )
                         precision_tracker.add_positive(key[3])
                     if len(tp_gold_bounding_boxes) == 0:
-                        key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}')
+                        key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}', 'false_positive')
                         precision_tracker.add_negative(key[3])
         eval_result: dict[str, dict[str, int]] = {}
         for rel in ('ガ', 'ヲ', 'ニ', 'ガ２', 'ノ', '='):
@@ -225,10 +243,11 @@ def main():
             (df_sum['precision_pos'] / df_sum['precision_total']).alias('precision'),
         ]
     )
+    pl.Config.set_tbl_rows(100)
     print(df)
     print(df_sum)
     total_textual_result = reduce(add, textual_results)
-    print(total_textual_result.to_dict())
+    # print(total_textual_result.to_dict())
     total_textual_result.export_csv('cohesion_result.csv')
     total_textual_result.export_txt('cohesion_result.txt')
 
