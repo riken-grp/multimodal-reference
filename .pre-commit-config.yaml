@@ -27,6 +27,6 @@ repos:
         exclude: mdetr/
         additional_dependencies:
           - rhoknp==1.2.2
-          - torch==1.12.1
+          - torch==1.13.1
           - dataclasses-json
           - omegaconf
