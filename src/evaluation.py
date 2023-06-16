@@ -45,7 +45,7 @@ class MMRefEvaluator:
         score_result = scorer.run()
         return score_result
 
-    def eval_visual_reference(self, prediction: PhraseGroundingPrediction, topk: int = -1) -> dict:
+    def eval_visual_reference(self, prediction: PhraseGroundingPrediction, topk: int = -1) -> list:
         recall_tracker = RatioTracker()
         precision_tracker = RatioTracker()
         # utterance ごとに評価
@@ -104,11 +104,11 @@ class MMRefEvaluator:
                         else:
                             pred_boxes = [bb.rect for bb in pred_bounding_boxes[:topk]]
                         if any(box_iou(gold_box, pred_box) >= self.iou_threshold for pred_box in pred_boxes):
-                            recall_tracker.add_positive(key[3])
+                            recall_tracker.add_positive(key)
                         else:
-                            recall_tracker.add_negative(key[3])
+                            recall_tracker.add_negative(key)
                     else:
-                        recall_tracker.add_negative(key[3])
+                        recall_tracker.add_negative(key)
 
                 # precision
                 for idx, pred_relation in enumerate(pred_relations):
@@ -134,19 +134,45 @@ class MMRefEvaluator:
                             tp_gold_bounding_box.instance_id,
                             tp_gold_bounding_box.class_name,
                         )
-                        precision_tracker.add_positive(key[3])
+                        precision_tracker.add_positive(key)
                     if len(tp_gold_bounding_boxes) == 0:
                         key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}', 'false_positive')
-                        precision_tracker.add_negative(key[3])
-        eval_result: dict[str, dict[str, int]] = {}
-        for rel in ('ガ', 'ヲ', 'ニ', 'ガ２', 'ノ', '='):
-            eval_result[rel] = {
-                'recall_pos': recall_tracker.positive[rel],
-                'recall_total': recall_tracker.total[rel],
-                'precision_pos': precision_tracker.positive[rel],
-                'precision_total': precision_tracker.total[rel],
-            }
-        return eval_result
+                        precision_tracker.add_negative(key)
+
+        result_dict: dict[tuple[str, str, int, str, str, str], dict[str, Any]] = {}
+        result_dict.update({key: {'recall_pos': value} for key, value in recall_tracker.positive.items()})
+        for key, value in recall_tracker.total.items():
+            if key in result_dict:
+                result_dict[key]['recall_total'] = value
+            else:
+                result_dict[key] = {'recall_total': value}
+        for key, value in precision_tracker.positive.items():
+            if key in result_dict:
+                result_dict[key]['precision_pos'] = value
+            else:
+                result_dict[key] = {'precision_pos': value}
+        for key, value in precision_tracker.total.items():
+            if key in result_dict:
+                result_dict[key]['precision_total'] = value
+            else:
+                result_dict[key] = {'precision_total': value}
+        results: list[dict[str, Any]] = []
+        for key, metrics in result_dict.items():
+            results.append(
+                {
+                    'image_id': key[0],
+                    'sid': key[1],
+                    'base_phrase_index': key[2],
+                    'relation_type': key[3],
+                    'instance_id': key[4],
+                    'class_name': key[5],
+                    'recall_pos': metrics.get('recall_pos', 0),
+                    'recall_total': metrics.get('recall_total', 0),
+                    'precision_pos': metrics.get('precision_pos', 0),
+                    'precision_total': metrics.get('precision_total', 0),
+                }
+            )
+        return results
 
 
 class RatioTracker:
@@ -223,31 +249,31 @@ def main():
             image_text_annotation,
         )
         textual_results.append(evaluator.eval_textual_reference(pred_document))
-        for rel, measure in evaluator.eval_visual_reference(prediction, topk=args.recall_topk).items():
-            result = {'scenario_id': scenario_id, 'rel': rel}
-            result.update(measure)
+        for row in evaluator.eval_visual_reference(prediction, topk=args.recall_topk):
+            result = {'scenario_id': scenario_id}
+            result.update(row)
             results.append(result)
     df = pl.DataFrame(results)
     df.drop_in_place('scenario_id')
-    df_sum = df.groupby('rel', maintain_order=True).sum()
-    # df = pl.concat([df, df_sum])
-    df = df.with_columns(
+    df_rel = df.groupby('relation_type', maintain_order=True).sum()
+    df_rel = df_rel.with_columns(
         [
-            (df['recall_pos'] / df['recall_total']).alias('recall'),
-            (df['precision_pos'] / df['precision_total']).alias('precision'),
-        ],
+            (df_rel['recall_pos'] / df_rel['recall_total']).alias('recall'),
+            (df_rel['precision_pos'] / df_rel['precision_total']).alias('precision'),
+        ]
     )
-    df_sum = df_sum.with_columns(
+    df_class = df.groupby('class_name', maintain_order=True).sum()
+    df_class = df_class.with_columns(
         [
-            (df_sum['recall_pos'] / df_sum['recall_total']).alias('recall'),
-            (df_sum['precision_pos'] / df_sum['precision_total']).alias('precision'),
+            (df_class['recall_pos'] / df_class['recall_total']).alias('recall'),
+            (df_class['precision_pos'] / df_class['precision_total']).alias('precision'),
         ]
     )
     pl.Config.set_tbl_rows(100)
-    print(df)
-    print(df_sum)
+    pl.Config.set_tbl_cols(16)
+    print(df_rel)
+    print(df_class)
     total_textual_result = reduce(add, textual_results)
-    # print(total_textual_result.to_dict())
     total_textual_result.export_csv('cohesion_result.csv')
     total_textual_result.export_txt('cohesion_result.txt')
 
