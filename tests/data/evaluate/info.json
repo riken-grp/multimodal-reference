@@ -7,9 +7,9 @@
         "test-0-0",
         "test-0-1"
       ],
-      "start": 100,
+      "start": 0,
       "end": 1500,
-      "duration": 1400,
+      "duration": 1500,
       "speaker": "主人",
       "image_ids": [
         "001",

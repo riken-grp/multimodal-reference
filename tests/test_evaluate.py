@@ -1,5 +1,7 @@
 from pathlib import Path
+from typing import Any
 
+import polars as pl
 from rhoknp import Document
 
 from evaluation import MMRefEvaluator
@@ -89,7 +91,18 @@ def test_evaluate(fixture_data_dir: Path):
         evaluate_dir.joinpath(f'{image_text_annotation.scenario_id}.json').read_text()
     )
 
-    result: dict[str, dict] = evaluator.eval_visual_reference(prediction)
+    results: list[dict[str, Any]] = evaluator.eval_visual_reference(prediction)
+    df = pl.DataFrame(results)
+    df_rel = df.groupby('relation_type', maintain_order=True).sum()
+    result = {}
+    for rel in ('ガ', 'ヲ', 'ニ', 'ノ', '='):
+        result[rel] = {
+            k: 0 if v.is_empty() else v.item()
+            for k, v in df_rel.filter(pl.col('relation_type') == rel)
+            .select(pl.col('recall_pos', 'recall_total', 'precision_pos', 'precision_total'))
+            .to_dict()
+            .items()
+        }
     assert (result['ガ']['recall_pos'], result['ガ']['recall_total'], result['ガ']['precision_total']) == (4, 7, 13)
     assert (result['ヲ']['recall_pos'], result['ヲ']['recall_total'], result['ヲ']['precision_total']) == (0, 0, 0)
     assert (result['ニ']['recall_pos'], result['ニ']['recall_total'], result['ニ']['precision_total']) == (0, 1, 0)
