@@ -111,7 +111,7 @@ class MMRefEvaluator:
                         recall_tracker.add_negative(key)
 
                 # precision
-                for idx, pred_relation in enumerate(pred_relations):
+                for rel_idx, pred_relation in enumerate(pred_relations):
                     relation_type = pred_relation.type
                     gold_relations = [rel for rel in phrase_annotation.relations if rel.type == relation_type]
                     if pred_relation.bounding_box.confidence < self.confidence_threshold:
@@ -136,7 +136,7 @@ class MMRefEvaluator:
                         )
                         precision_tracker.add_positive(key)
                     if len(tp_gold_bounding_boxes) == 0:
-                        key = (image_id, sid, base_phrase.index, relation_type, f'fp_{idx}', 'false_positive')
+                        key = (image_id, sid, base_phrase.index, relation_type, f'fp_{rel_idx}', 'false_positive')
                         precision_tracker.add_negative(key)
 
         result_dict: dict[tuple[str, str, int, str, str, str], dict[str, Any]] = {}
