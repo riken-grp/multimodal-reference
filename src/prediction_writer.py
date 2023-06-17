@@ -1,4 +1,5 @@
 import copy
+import itertools
 import math
 import subprocess
 import tempfile
@@ -8,7 +9,7 @@ from pathlib import Path
 
 import hydra
 from omegaconf import DictConfig
-from rhoknp import Document
+from rhoknp import Document, Sentence
 from rhoknp.cohesion import EndophoraArgument, ExophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
@@ -97,7 +98,7 @@ def run_mdetr(
     cfg: DictConfig, dataset_info: DatasetInfo, dataset_dir: Path, document: Document
 ) -> PhraseGroundingPrediction:
     utterance_results: list[UtterancePrediction] = []
-    sid2sentence = {sentence.sid: sentence for sentence in document.sentences}
+    sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in document.sentences}
     for idx, utterance in enumerate(dataset_info.utterances):
         start_index = math.ceil(utterance.start / 1000)
         if idx + 1 < len(dataset_info.utterances):
@@ -116,7 +117,6 @@ def run_mdetr(
             )
             for base_phrase in caption.base_phrases
         ]
-        image_files: list[Path] = [dataset_dir.joinpath(image.path) for image in corresponding_images]
         with tempfile.TemporaryDirectory() as out_dir:
             caption_file = Path(out_dir).joinpath('caption.jpp')
             caption_file.write_text(caption.to_jumanpp())
@@ -132,20 +132,19 @@ def run_mdetr(
                     f'--export-dir={out_dir}',
                     '--image-files',
                 ]
-                + [str(file) for file in image_files]
+                + [str(dataset_dir / image.path) for image in corresponding_images]
             )
             predictions = [MDETRPrediction.from_json(file.read_text()) for file in Path(out_dir).glob('*.json')]
 
-        for image, prediction in zip(corresponding_images, predictions):
+        assert len(corresponding_images) == len(predictions)
+        for (image, prediction), (phrase, base_phrase) in itertools.product(
+            zip(corresponding_images, predictions),
+            zip(phrases, caption.base_phrases),
+        ):
             for bounding_box in prediction.bounding_boxes:
-                for phrase, base_phrase in zip(phrases, caption.base_phrases):
-                    words = [prediction.words[m.global_index] for m in base_phrase.morphemes]
-                    assert ''.join(words) == phrase.text == base_phrase.text
-                    prob = max(bounding_box.word_probs[m.global_index] for m in base_phrase.morphemes)
-                    if prob >= 0.1:
-                        phrase.relations.append(
-                            RelationPrediction(type='=', image_id=image.id, bounding_box=bounding_box)
-                        )
+                prob = max(bounding_box.word_probs[m.global_index] for m in base_phrase.morphemes)
+                if prob >= 0.1:
+                    phrase.relations.append(RelationPrediction(type='=', image_id=image.id, bounding_box=bounding_box))
         utterance_results.append(UtterancePrediction(text=caption.text, sids=utterance.sids, phrases=phrases))
 
     return PhraseGroundingPrediction(
