@@ -126,6 +126,8 @@ def run_mdetr(
                     f'{cfg.project_root}/run_mdetr.py',
                     f'--model={cfg.checkpoint}',
                     f'--caption-file={caption_file}',
+                    f'--backbone-name={cfg.backbone_name}',
+                    f'--text-encoder={cfg.text_encoder}',
                     f'--batch-size={cfg.batch_size}',
                     f'--export-dir={out_dir}',
                     '--image-files',

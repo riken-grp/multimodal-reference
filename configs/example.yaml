@@ -11,6 +11,8 @@ mdetr:
   python: /path/to/mdetr/.venv/bin/python
   project_root: /path/to/mdetr
   checkpoint: /path/to/trained/mdetr/checkpoint
+  backbone_name: timm_tf_efficientnet_b3_ns
+  text_encoder: xlm-roberta-base
   batch_size: 16
 
 dataset_dir: /path/to/dataset
