@@ -1,4 +1,5 @@
 import argparse
+import math
 from itertools import repeat
 from pathlib import Path
 from typing import Optional, Union
@@ -186,12 +187,20 @@ def visualize(
         image_annotation.image_id: image_annotation for image_annotation in image_text_annotation.images
     }
     sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in gold_document.sentences}
-    for utterance, utterance_annotation, utterance_prediction in zip(
-        dataset_info.utterances, utterance_annotations, prediction.utterances if prediction else repeat(None)
+    all_image_ids = [image.id for image in dataset_info.images]
+    assert len(dataset_info.utterances) == len(utterance_annotations)
+    for idx, (utterance, utterance_annotation, utterance_prediction) in enumerate(
+        zip(dataset_info.utterances, utterance_annotations, prediction.utterances if prediction else repeat(None))
     ):
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
         assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text
-        for image_id in utterance.image_ids:
+        start_index = math.ceil(utterance.start / 1000)
+        if idx + 1 < len(dataset_info.utterances):
+            next_utterance = dataset_info.utterances[idx + 1]
+            end_index = math.ceil(next_utterance.start / 1000)
+        else:
+            end_index = len(all_image_ids)
+        for image_id in all_image_ids[start_index:end_index]:
             image_annotation = image_id_to_annotation[image_id]
             image = Image.open(image_dir / f'{image_annotation.image_id}.png')
             plot_results(
