@@ -8,6 +8,8 @@ cohesion:
   checkpoint: /path/to/trained/cohesion/checkpoint
 
 mdetr:
+  python: /path/to/mdetr/.venv/bin/python
+  project_root: /path/to/mdetr
   checkpoint: /path/to/trained/mdetr/checkpoint
   batch_size: 16
 
