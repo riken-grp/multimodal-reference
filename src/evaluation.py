@@ -82,7 +82,9 @@ class MMRefEvaluator:
                         continue
                     relation_type = gold_relation.type
                     gold_bounding_box = instance_id_to_bounding_box[gold_relation.instance_id]
-                    gold_box: Rectangle = gold_bounding_box.rect
+                    # 領域矩形は評価から除外
+                    if gold_bounding_box.class_name == 'region':
+                        continue
                     key = (
                         image_id,
                         sid,
@@ -97,6 +99,7 @@ class MMRefEvaluator:
                         reverse=True,
                     )
                     if len(pred_bounding_boxes) > 0:
+                        gold_box: Rectangle = gold_bounding_box.rect
                         if topk == -1:
                             pred_boxes = [
                                 bb.rect for bb in pred_bounding_boxes if bb.confidence >= self.confidence_threshold
@@ -120,7 +123,10 @@ class MMRefEvaluator:
                     gold_bounding_boxes = [
                         instance_id_to_bounding_box[rel.instance_id]
                         for rel in gold_relations
-                        if rel.instance_id in instance_id_to_bounding_box
+                        if (
+                            rel.instance_id in instance_id_to_bounding_box
+                            and instance_id_to_bounding_box[rel.instance_id].class_name != 'region'
+                        )
                     ]
                     tp_gold_bounding_boxes = [
                         bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
