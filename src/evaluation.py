@@ -261,14 +261,22 @@ def main():
             results.append(result)
     df = pl.DataFrame(results)
     df.drop_in_place('scenario_id')
-    df_rel = df.groupby('relation_type', maintain_order=True).sum()
+    df_rel = (
+        df.groupby('relation_type', maintain_order=True)
+        .sum()
+        .drop(['image_id', 'sid', 'base_phrase_index', 'instance_id', 'class_name'])
+    )
     df_rel = df_rel.with_columns(
         [
             (df_rel['recall_pos'] / df_rel['recall_total']).alias('recall'),
             (df_rel['precision_pos'] / df_rel['precision_total']).alias('precision'),
         ]
     )
-    df_class = df.groupby('class_name', maintain_order=True).sum()
+    df_class = (
+        df.groupby('class_name', maintain_order=True)
+        .sum()
+        .drop(['image_id', 'sid', 'base_phrase_index', 'relation_type', 'instance_id'])
+    )
     df_class = df_class.with_columns(
         [
             (df_class['recall_pos'] / df_class['recall_total']).alias('recall'),
