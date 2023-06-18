@@ -134,7 +134,7 @@ def run_mdetr(
                 ]
                 + [str(dataset_dir / image.path) for image in corresponding_images]
             )
-            predictions = [MDETRPrediction.from_json(file.read_text()) for file in Path(out_dir).glob('*.json')]
+            predictions = [MDETRPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob('*.json'))]
 
         assert len(corresponding_images) == len(predictions)
         for (image, prediction), (phrase, base_phrase) in itertools.product(
