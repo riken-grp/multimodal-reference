@@ -254,7 +254,8 @@ def main():
 
     if "class" in args.eval_modes:
         df_class = (
-            df.groupby("class_name", maintain_order=True)
+            df.filter(pl.col("relation_type") == "=")
+            .groupby("class_name", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id"])
         )
