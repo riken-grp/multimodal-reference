@@ -202,6 +202,9 @@ def parse_args():
     parser.add_argument("--scenario-ids", type=str, nargs="*", help="List of scenario ids.")
     parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
     parser.add_argument(
+        "--eval-modes", type=str, default="rel", nargs="*", choices=["rel", "class", "text"], help="evaluation modes"
+    )
+    parser.add_argument(
         "--format", type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help="table format to print"
     )
     return parser.parse_args()
@@ -234,42 +237,54 @@ def main():
             results.append(result)
     df = pl.DataFrame(results)
     df.drop_in_place("scenario_id")
-    df_rel = (
-        df.groupby("relation_type", maintain_order=True)
-        .sum()
-        .drop(["image_id", "sid", "base_phrase_index", "instance_id", "class_name"])
-    )
-    df_rel = df_rel.with_columns(
-        [
-            (df_rel["recall_pos"] / df_rel["recall_total"]).alias("recall"),
-            (df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision"),
-        ]
-    )
-    df_class = (
-        df.groupby("class_name", maintain_order=True)
-        .sum()
-        .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id"])
-    )
-    df_class = df_class.with_columns(
-        [
-            (df_class["recall_pos"] / df_class["recall_total"]).alias("recall"),
-            (df_class["precision_pos"] / df_class["precision_total"]).alias("precision"),
-        ]
-    )
-    if args.format == "repr":
+
+    if "rel" in args.eval_modes:
+        df_rel = (
+            df.groupby("relation_type", maintain_order=True)
+            .sum()
+            .drop(["image_id", "sid", "base_phrase_index", "instance_id", "class_name"])
+        )
+        df_rel = df_rel.with_columns(
+            [
+                (df_rel["recall_pos"] / df_rel["recall_total"]).alias("recall"),
+                (df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision"),
+            ]
+        )
+        print(df_to_string(df_rel, args.format))
+
+    if "class" in args.eval_modes:
+        df_class = (
+            df.groupby("class_name", maintain_order=True)
+            .sum()
+            .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id"])
+        )
+        df_class = df_class.with_columns(
+            [
+                (df_class["recall_pos"] / df_class["recall_total"]).alias("recall"),
+                (df_class["precision_pos"] / df_class["precision_total"]).alias("precision"),
+            ]
+        )
+        print(df_to_string(df_class, args.format))
+
+    if "text" in args.eval_modes:
+        total_textual_result = reduce(add, textual_results)
+        total_textual_result.export_csv("cohesion_result.csv")
+        total_textual_result.export_txt("cohesion_result.txt")
+
+
+def df_to_string(df: pl.DataFrame, format_: str) -> str:
+    if format_ == "repr":
         pl.Config.set_tbl_rows(100)
         pl.Config.set_tbl_cols(16)
-        print(df_rel)
-    elif args.format == "csv":
-        print(df_rel.write_csv())
-    elif args.format == "tsv":
-        print(df_rel.write_csv(separator="\t"))
-    elif args.format == "json":
-        print(df_rel.write_json())
-    print(df_class)
-    total_textual_result = reduce(add, textual_results)
-    total_textual_result.export_csv("cohesion_result.csv")
-    total_textual_result.export_txt("cohesion_result.txt")
+        return str(df)
+    elif format_ == "csv":
+        return df.write_csv()
+    elif format_ == "tsv":
+        return df.write_csv(separator="\t")
+    elif format_ == "json":
+        return df.write_json()
+    else:
+        raise ValueError(f"Unknown format: {format_}")
 
 
 if __name__ == "__main__":
