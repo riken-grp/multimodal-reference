@@ -31,22 +31,22 @@ def get_core_expression(unit: Union[BasePhrase]) -> tuple[str, str, str]:
     morphemes = unit.morphemes
     sidx = 0
     for i, morpheme in enumerate(morphemes):
-        if morpheme.pos not in ('助詞', '特殊', '判定詞'):
+        if morpheme.pos not in ("助詞", "特殊", "判定詞"):
             sidx += i
             break
     eidx = len(morphemes)
     for i, morpheme in enumerate(reversed(morphemes)):
-        if morpheme.pos not in ('助詞', '特殊', '判定詞'):
+        if morpheme.pos not in ("助詞", "特殊", "判定詞"):
             eidx -= i
             break
-    ret = ''.join(m.text for m in morphemes[sidx:eidx])
+    ret = "".join(m.text for m in morphemes[sidx:eidx])
     if not ret:
         sidx = 0
         eidx = len(morphemes)
     return (
-        ''.join(m.text for m in morphemes[:sidx]),
-        ''.join(m.text for m in morphemes[sidx:eidx]),
-        ''.join(m.text for m in morphemes[eidx:]),
+        "".join(m.text for m in morphemes[:sidx]),
+        "".join(m.text for m in morphemes[sidx:eidx]),
+        "".join(m.text for m in morphemes[eidx:]),
     )
 
 
@@ -65,24 +65,24 @@ def plot_results(
     np_image = np.array(image)
     ax = plt.gca()
 
-    if 'pred' in plots:
+    if "pred" in plots:
         draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk)
 
-    if 'gold' in plots:
+    if "gold" in plots:
         draw_annotation(ax, base_phrases, image_annotation, phrase_annotations)
 
     ax.text(
         -10,
         -50,
-        ''.join(bp.text for bp in base_phrases),
+        "".join(bp.text for bp in base_phrases),
         fontsize=24,
         bbox=dict(facecolor=(1.0, 1.0, 1.0), alpha=0.8),
-        fontname='Hiragino Maru Gothic Pro',
+        fontname="Hiragino Maru Gothic Pro",
     )
 
     plt.imshow(np_image)
-    plt.axis('off')
-    plt.savefig(str(export_dir / f'{image_annotation.image_id}.png'))
+    plt.axis("off")
+    plt.savefig(str(export_dir / f"{image_annotation.image_id}.png"))
     # plt.show()
 
 
@@ -94,7 +94,7 @@ def draw_annotation(ax, base_phrases, image_annotation, phrase_annotations):
             base_phrase = next(filter(lambda bp: bp.text == phrase_annotation.text, base_phrases))
             for relation in phrase_annotation.relations:
                 if relation.instance_id == bounding_box.instance_id:
-                    labels.append(f'{relation.type}_{get_core_expression(base_phrase)[1]}')
+                    labels.append(f"{relation.type}_{get_core_expression(base_phrase)[1]}")
         if not labels:
             continue
         # color = colors.pop()
@@ -102,10 +102,10 @@ def draw_annotation(ax, base_phrases, image_annotation, phrase_annotations):
         ax.text(
             rect.x1,
             rect.y1,
-            ', '.join(labels),
+            ", ".join(labels),
             fontsize=24,
             bbox=dict(facecolor=GOLD_COLOR, alpha=0.8),
-            fontname='Hiragino Maru Gothic Pro',
+            fontname="Hiragino Maru Gothic Pro",
         )
 
 
@@ -126,7 +126,7 @@ def draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, ph
                 pred_bounding_box = pred_relation.bounding_box
                 rect = pred_bounding_box.rect
                 base_phrase = next(filter(lambda bp: bp.text == phrase_prediction.text, base_phrases))
-                label = '{type}_{text}: {score:0.2f}'.format(
+                label = "{type}_{text}: {score:0.2f}".format(
                     type=pred_relation.type,
                     text=get_core_expression(base_phrase)[1],
                     score=pred_bounding_box.confidence,
@@ -139,19 +139,19 @@ def draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, ph
                     label,
                     fontsize=24,
                     bbox=dict(facecolor=color, alpha=0.8),
-                    fontname='Hiragino Maru Gothic Pro',
+                    fontname="Hiragino Maru Gothic Pro",
                 )
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset-dir', '-d', type=Path, help='Path to the directory containing the target dataset.')
-    parser.add_argument('--gold-knp-dir', '-k', type=Path, help='Path to the gold KNP directory.')
-    parser.add_argument('--image-annotation-dir', '-i', type=Path, help='Path to the gold image text annotation file.')
-    parser.add_argument('--export-dir', '-e', type=Path, help='Path to the directory where tagged images are exported')
-    parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction file.')
-    parser.add_argument('--scenario-ids', '--ids', type=str, nargs='*', help='List of scenario ids.')
-    parser.add_argument('--plots', type=str, nargs='*', choices=["gold", "pred"], help='Plotting target.')
+    parser.add_argument("--dataset-dir", "-d", type=Path, help="Path to the directory containing the target dataset.")
+    parser.add_argument("--gold-knp-dir", "-k", type=Path, help="Path to the gold KNP directory.")
+    parser.add_argument("--image-annotation-dir", "-i", type=Path, help="Path to the gold image text annotation file.")
+    parser.add_argument("--export-dir", "-e", type=Path, help="Path to the directory where tagged images are exported")
+    parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction file.")
+    parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
+    parser.add_argument("--plots", type=str, nargs="*", choices=["gold", "pred"], help="Plotting target.")
     return parser.parse_args()
 
 
@@ -160,13 +160,13 @@ def main():
     for scenario_id in args.scenario_ids:
         export_dir = args.export_dir / scenario_id
         export_dir.mkdir(parents=True, exist_ok=True)
-        dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
-        image_dir = args.dataset_dir / scenario_id / 'images'
-        gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
+        dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())
+        image_dir = args.dataset_dir / scenario_id / "images"
+        gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
         image_text_annotation = ImageTextAnnotation.from_json(
-            args.image_annotation_dir.joinpath(f'{scenario_id}.json').read_text()
+            args.image_annotation_dir.joinpath(f"{scenario_id}.json").read_text()
         )
-        if (prediction_file := args.prediction_dir.joinpath(f'{scenario_id}.json')).exists():
+        if (prediction_file := args.prediction_dir.joinpath(f"{scenario_id}.json")).exists():
             prediction = PhraseGroundingPrediction.from_json(prediction_file.read_text())
         else:
             prediction = None
@@ -193,7 +193,7 @@ def visualize(
         zip(dataset_info.utterances, utterance_annotations, prediction.utterances if prediction else repeat(None))
     ):
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
-        assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text
+        assert "".join(bp.text for bp in base_phrases) == utterance_annotation.text
         start_index = math.ceil(utterance.start / 1000)
         if idx + 1 < len(dataset_info.utterances):
             next_utterance = dataset_info.utterances[idx + 1]
@@ -202,7 +202,7 @@ def visualize(
             end_index = len(all_image_ids)
         for image_id in all_image_ids[start_index:end_index]:
             image_annotation = image_id_to_annotation[image_id]
-            image = Image.open(image_dir / f'{image_annotation.image_id}.png')
+            image = Image.open(image_dir / f"{image_annotation.image_id}.png")
             plot_results(
                 image,
                 image_annotation,
@@ -215,5 +215,5 @@ def visualize(
             )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

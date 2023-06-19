@@ -7,7 +7,7 @@ number = Union[int, float]
 
 
 class CamelCaseDataClassJsonMixin(DataClassJsonMixin):
-    dataclass_json_config = config(letter_case=LetterCase.CAMEL)['dataclasses_json']  # type: ignore
+    dataclass_json_config = config(letter_case=LetterCase.CAMEL)["dataclasses_json"]  # type: ignore
 
 
 @dataclass
@@ -59,25 +59,25 @@ class Rectangle(CamelCaseDataClassJsonMixin):
         return self.w * self.h
 
     @classmethod
-    def from_xyxy(cls, x1: number, y1: number, x2: number, y2: number) -> 'Rectangle':
+    def from_xyxy(cls, x1: number, y1: number, x2: number, y2: number) -> "Rectangle":
         return cls(*map(int, (x1, y1, x2, y2)))
 
     def to_xyxy(self) -> tuple[int, int, int, int]:
         return min(self.x1, self.x2), min(self.y1, self.y2), max(self.x1, self.x2), max(self.y1, self.y2)
 
     @classmethod
-    def from_cxcywh(cls, x: number, y: number, w: number, h: number) -> 'Rectangle':
+    def from_cxcywh(cls, x: number, y: number, w: number, h: number) -> "Rectangle":
         if w < 0 or h < 0:
-            raise ValueError('w and h must be positive')
+            raise ValueError("w and h must be positive")
         return cls.from_xyxy(x - w / 2, y - h / 2, x + w / 2, y + h / 2)
 
     @classmethod
-    def from_xywh(cls, top_left_x: number, top_left_y: number, w: number, h: number) -> 'Rectangle':
+    def from_xywh(cls, top_left_x: number, top_left_y: number, w: number, h: number) -> "Rectangle":
         if w < 0 or h < 0:
-            raise ValueError('w and h must be positive')
+            raise ValueError("w and h must be positive")
         return cls.from_xyxy(top_left_x, top_left_y, top_left_x + w, top_left_y + h)
 
-    def __and__(self, other: Any) -> 'Rectangle':
+    def __and__(self, other: Any) -> "Rectangle":
         if isinstance(other, type(self)) is False:
             raise TypeError(f"unsupported operand type(s) for &: '{type(self)}' and '{type(other)}'")
         xyxy1, xyxy2 = self.to_xyxy(), other.to_xyxy()

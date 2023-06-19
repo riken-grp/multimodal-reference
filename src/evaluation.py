@@ -38,7 +38,7 @@ class MMRefEvaluator:
             cases=list(CASES),
             bridging=True,
             coreference=True,
-            exophora_referents=[ExophoraReferent(e) for e in '著者 読者 不特定:人 不特定:物'.split()],
+            exophora_referents=[ExophoraReferent(e) for e in "著者 読者 不特定:人 不特定:物".split()],
             pas=True,
         )
         score_result = scorer.run()
@@ -55,7 +55,7 @@ class MMRefEvaluator:
             zip(self.dataset_info.utterances, self.utterance_annotations, prediction.utterances)
         ):
             base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
-            assert ''.join(bp.text for bp in base_phrases) == utterance_annotation.text == utterance_prediction.text
+            assert "".join(bp.text for bp in base_phrases) == utterance_annotation.text == utterance_prediction.text
             start_index = math.ceil(utterance.start / 1000)
             if idx + 1 < len(self.dataset_info.utterances):
                 next_utterance = self.dataset_info.utterances[idx + 1]
@@ -82,7 +82,7 @@ class MMRefEvaluator:
                     relation_type = gold_relation.type
                     gold_bounding_box = instance_id_to_bounding_box[gold_relation.instance_id]
                     # 領域矩形は評価から除外
-                    if gold_bounding_box.class_name == 'region':
+                    if gold_bounding_box.class_name == "region":
                         continue
                     key = (
                         image_id,
@@ -124,7 +124,7 @@ class MMRefEvaluator:
                         for rel in gold_relations
                         if (
                             rel.instance_id in instance_id_to_bounding_box
-                            and instance_id_to_bounding_box[rel.instance_id].class_name != 'region'
+                            and instance_id_to_bounding_box[rel.instance_id].class_name != "region"
                         )
                     ]
                     tp_gold_bounding_boxes = [
@@ -141,40 +141,40 @@ class MMRefEvaluator:
                         )
                         precision_tracker.add_positive(key)
                     if len(tp_gold_bounding_boxes) == 0:
-                        key = (image_id, sid, base_phrase.index, relation_type, f'fp_{rel_idx}', 'false_positive')
+                        key = (image_id, sid, base_phrase.index, relation_type, f"fp_{rel_idx}", "false_positive")
                         precision_tracker.add_negative(key)
 
         result_dict: dict[tuple[str, str, int, str, str, str], dict[str, Any]] = {}
-        result_dict.update({key: {'recall_pos': value} for key, value in recall_tracker.positive.items()})
+        result_dict.update({key: {"recall_pos": value} for key, value in recall_tracker.positive.items()})
         for key, value in recall_tracker.total.items():
             if key in result_dict:
-                result_dict[key]['recall_total'] = value
+                result_dict[key]["recall_total"] = value
             else:
-                result_dict[key] = {'recall_total': value}
+                result_dict[key] = {"recall_total": value}
         for key, value in precision_tracker.positive.items():
             if key in result_dict:
-                result_dict[key]['precision_pos'] = value
+                result_dict[key]["precision_pos"] = value
             else:
-                result_dict[key] = {'precision_pos': value}
+                result_dict[key] = {"precision_pos": value}
         for key, value in precision_tracker.total.items():
             if key in result_dict:
-                result_dict[key]['precision_total'] = value
+                result_dict[key]["precision_total"] = value
             else:
-                result_dict[key] = {'precision_total': value}
+                result_dict[key] = {"precision_total": value}
         results: list[dict[str, Any]] = []
         for key, metrics in result_dict.items():
             results.append(
                 {
-                    'image_id': key[0],
-                    'sid': key[1],
-                    'base_phrase_index': key[2],
-                    'relation_type': key[3],
-                    'instance_id': key[4],
-                    'class_name': key[5],
-                    'recall_pos': metrics.get('recall_pos', 0),
-                    'recall_total': metrics.get('recall_total', 0),
-                    'precision_pos': metrics.get('precision_pos', 0),
-                    'precision_total': metrics.get('precision_total', 0),
+                    "image_id": key[0],
+                    "sid": key[1],
+                    "base_phrase_index": key[2],
+                    "relation_type": key[3],
+                    "instance_id": key[4],
+                    "class_name": key[5],
+                    "recall_pos": metrics.get("recall_pos", 0),
+                    "recall_total": metrics.get("recall_total", 0),
+                    "precision_pos": metrics.get("precision_pos", 0),
+                    "precision_total": metrics.get("precision_total", 0),
                 }
             )
         return results
@@ -195,14 +195,14 @@ class RatioTracker:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset-dir', '-d', type=Path, help='Path to the directory containing the target dataset.')
-    parser.add_argument('--gold-knp-dir', '-k', type=Path, help='Path to the gold KNP directory.')
-    parser.add_argument('--gold-image-dir', '-i', type=Path, help='Path to the gold image text annotation file.')
-    parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction directory.')
-    parser.add_argument('--scenario-ids', type=str, nargs='*', help='List of scenario ids.')
-    parser.add_argument('--recall-topk', '--topk', type=int, default=-1, help='For calculating Recall@k.')
+    parser.add_argument("--dataset-dir", "-d", type=Path, help="Path to the directory containing the target dataset.")
+    parser.add_argument("--gold-knp-dir", "-k", type=Path, help="Path to the gold KNP directory.")
+    parser.add_argument("--gold-image-dir", "-i", type=Path, help="Path to the gold image text annotation file.")
+    parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction directory.")
+    parser.add_argument("--scenario-ids", type=str, nargs="*", help="List of scenario ids.")
+    parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
     parser.add_argument(
-        '--format', type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help='table format to print'
+        "--format", type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help="table format to print"
     )
     return parser.parse_args()
 
@@ -212,14 +212,14 @@ def main():
     textual_results: list[ScoreResult] = []
     results = []
     for scenario_id in args.scenario_ids:
-        dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f'{scenario_id}/info.json').read_text())
-        gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f'{scenario_id}.knp').read_text())
-        pred_document = Document.from_knp(args.prediction_dir.joinpath(f'{scenario_id}.knp').read_text())
+        dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())
+        gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
+        pred_document = Document.from_knp(args.prediction_dir.joinpath(f"{scenario_id}.knp").read_text())
         image_text_annotation = ImageTextAnnotation.from_json(
-            args.gold_image_dir.joinpath(f'{scenario_id}.json').read_text()
+            args.gold_image_dir.joinpath(f"{scenario_id}.json").read_text()
         )
         prediction = PhraseGroundingPrediction.from_json(
-            args.prediction_dir.joinpath(f'{scenario_id}.json').read_text()
+            args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
         )
 
         evaluator = MMRefEvaluator(
@@ -229,31 +229,31 @@ def main():
         )
         textual_results.append(evaluator.eval_textual_reference(pred_document))
         for row in evaluator.eval_visual_reference(prediction, topk=args.recall_topk):
-            result = {'scenario_id': scenario_id}
+            result = {"scenario_id": scenario_id}
             result.update(row)
             results.append(result)
     df = pl.DataFrame(results)
-    df.drop_in_place('scenario_id')
+    df.drop_in_place("scenario_id")
     df_rel = (
-        df.groupby('relation_type', maintain_order=True)
+        df.groupby("relation_type", maintain_order=True)
         .sum()
-        .drop(['image_id', 'sid', 'base_phrase_index', 'instance_id', 'class_name'])
+        .drop(["image_id", "sid", "base_phrase_index", "instance_id", "class_name"])
     )
     df_rel = df_rel.with_columns(
         [
-            (df_rel['recall_pos'] / df_rel['recall_total']).alias('recall'),
-            (df_rel['precision_pos'] / df_rel['precision_total']).alias('precision'),
+            (df_rel["recall_pos"] / df_rel["recall_total"]).alias("recall"),
+            (df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision"),
         ]
     )
     df_class = (
-        df.groupby('class_name', maintain_order=True)
+        df.groupby("class_name", maintain_order=True)
         .sum()
-        .drop(['image_id', 'sid', 'base_phrase_index', 'relation_type', 'instance_id'])
+        .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id"])
     )
     df_class = df_class.with_columns(
         [
-            (df_class['recall_pos'] / df_class['recall_total']).alias('recall'),
-            (df_class['precision_pos'] / df_class['precision_total']).alias('precision'),
+            (df_class["recall_pos"] / df_class["recall_total"]).alias("recall"),
+            (df_class["precision_pos"] / df_class["precision_total"]).alias("precision"),
         ]
     )
     if args.format == "repr":
@@ -268,9 +268,9 @@ def main():
         print(df_rel.write_json())
     print(df_class)
     total_textual_result = reduce(add, textual_results)
-    total_textual_result.export_csv('cohesion_result.csv')
-    total_textual_result.export_txt('cohesion_result.txt')
+    total_textual_result.export_csv("cohesion_result.csv")
+    total_textual_result.export_txt("cohesion_result.txt")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

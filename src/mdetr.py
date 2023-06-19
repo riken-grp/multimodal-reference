@@ -14,7 +14,7 @@ from transformers import BatchEncoding, CharSpan
 
 from utils.util import CamelCaseDataClassJsonMixin, Rectangle
 
-sys.path.append('./mdetr')
+sys.path.append("./mdetr")
 from hubconf import _make_detr  # noqa: E402
 
 torch.set_grad_enabled(False)
@@ -89,15 +89,15 @@ def plot_results(image: ImageFile, prediction: MDETRPrediction) -> None:
         ax.text(
             rect.x1,
             rect.y1,
-            f'{label}: {score:0.2f}',
+            f"{label}: {score:0.2f}",
             fontsize=15,
             bbox=dict(facecolor=color, alpha=0.8),
-            fontname='Hiragino Maru Gothic Pro',
+            fontname="Hiragino Maru Gothic Pro",
         )
 
     plt.imshow(np_image)
-    plt.axis('off')
-    plt.savefig('output.png')
+    plt.axis("off")
+    plt.savefig("output.png")
     plt.show()
 
 
@@ -106,9 +106,9 @@ def predict_mdetr(
 ) -> list[MDETRPrediction]:
     if len(images) == 0:
         return []
-    model = _make_detr(backbone_name='timm_tf_efficientnet_b3_ns', text_encoder='xlm-roberta-base')
-    checkpoint = torch.load(str(checkpoint_path), map_location='cpu')
-    model.load_state_dict(checkpoint['model'])
+    model = _make_detr(backbone_name="timm_tf_efficientnet_b3_ns", text_encoder="xlm-roberta-base")
+    checkpoint = torch.load(str(checkpoint_path), map_location="cpu")
+    model.load_state_dict(checkpoint["model"])
     if torch.cuda.is_available():
         model = model.cuda()
     model.eval()
@@ -137,9 +137,9 @@ def predict_mdetr(
         # proj_tokens: (b, 28, 64)
         # tokenized: BatchEncoding
         outputs: dict = model(img, [caption.text] * img.size(0), encode_and_save=False, memory_cache=memory_cache)
-        pred_logits: torch.Tensor = outputs['pred_logits'].cpu()  # (b, cand, seq)
-        pred_boxes: torch.Tensor = outputs['pred_boxes'].cpu()  # (b, cand, 4)
-        tokenized: BatchEncoding = memory_cache['tokenized']
+        pred_logits: torch.Tensor = outputs["pred_logits"].cpu()  # (b, cand, seq)
+        pred_boxes: torch.Tensor = outputs["pred_boxes"].cpu()  # (b, cand, 4)
+        tokenized: BatchEncoding = memory_cache["tokenized"]
 
         for pred_logit, pred_box in zip(pred_logits, pred_boxes):  # (cand, seq), (cand, 4)
             # keep only predictions with 0.0+ confidence
@@ -181,11 +181,11 @@ def predict_mdetr(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', '-m', type=str, help='Path to trained model.')
+    parser.add_argument("--model", "-m", type=str, help="Path to trained model.")
     # parser.add_argument('--image-dir', '--img', type=str, help='Path to the directory containing images.')
-    parser.add_argument('--image-path', '--img', type=str, help='Path to the images file.')
+    parser.add_argument("--image-path", "--img", type=str, help="Path to the images file.")
     parser.add_argument(
-        '--text', type=str, default='5 people each holding an umbrella', help='split text to perform grounding.'
+        "--text", type=str, default="5 people each holding an umbrella", help="split text to perform grounding."
     )
     # parser.add_argument('--dialog-ids', '--id', type=str, help='Path to the file containing dialog ids.')
     args = parser.parse_args()
@@ -199,5 +199,5 @@ def main():
     plot_results(image, predictions[0])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
