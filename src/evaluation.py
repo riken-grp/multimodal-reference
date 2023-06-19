@@ -2,7 +2,6 @@ import argparse
 import itertools
 import math
 from collections import defaultdict
-from dataclasses import dataclass
 from functools import reduce
 from operator import add
 from pathlib import Path
@@ -194,38 +193,6 @@ class RatioTracker:
         self.total[category] += 1
 
 
-@dataclass
-class Measure:
-    """A data class to calculate and represent F-measure"""
-
-    correct: int = 0
-    denom_gold: int = 0
-    denom_pred: int = 0
-
-    def __add__(self, other: 'Measure'):
-        return Measure(
-            self.denom_pred + other.denom_pred, self.denom_gold + other.denom_gold, self.correct + other.correct
-        )
-
-    @property
-    def precision(self) -> float:
-        if self.denom_pred == 0:
-            return 0.0
-        return self.correct / self.denom_pred
-
-    @property
-    def recall(self) -> float:
-        if self.denom_gold == 0:
-            return 0.0
-        return self.correct / self.denom_gold
-
-    @property
-    def f1(self) -> float:
-        if self.denom_pred + self.denom_gold == 0:
-            return 0.0
-        return 2 * self.correct / (self.denom_pred + self.denom_gold)
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset-dir', '-d', type=Path, help='Path to the directory containing the target dataset.')
@@ -234,6 +201,7 @@ def main():
     parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction directory.')
     parser.add_argument('--scenario-ids', type=str, nargs='*', help='List of scenario ids.')
     parser.add_argument('--recall-topk', '--topk', type=int, default=-1, help='For calculating Recall@k.')
+    parser.add_argument('--format', type=str, default="repr", help='table format to print')
     args = parser.parse_args()
 
     textual_results: list[ScoreResult] = []
@@ -283,9 +251,16 @@ def main():
             (df_class['precision_pos'] / df_class['precision_total']).alias('precision'),
         ]
     )
-    pl.Config.set_tbl_rows(100)
-    pl.Config.set_tbl_cols(16)
-    print(df_rel)
+    if args.format == "repr":
+        pl.Config.set_tbl_rows(100)
+        pl.Config.set_tbl_cols(16)
+        print(df_rel)
+    elif args.format == "csv":
+        print(df_rel.write_csv())
+    elif args.format == "tsv":
+        print(df_rel.write_csv(separator="\t"))
+    elif args.format == "json":
+        print(df_rel.write_json())
     print(df_class)
     total_textual_result = reduce(add, textual_results)
     total_textual_result.export_csv('cohesion_result.csv')
