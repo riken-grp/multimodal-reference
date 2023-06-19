@@ -193,7 +193,7 @@ class RatioTracker:
         self.total[category] += 1
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset-dir', '-d', type=Path, help='Path to the directory containing the target dataset.')
     parser.add_argument('--gold-knp-dir', '-k', type=Path, help='Path to the gold KNP directory.')
@@ -201,9 +201,14 @@ def main():
     parser.add_argument('--prediction-dir', '-p', type=Path, help='Path to the prediction directory.')
     parser.add_argument('--scenario-ids', type=str, nargs='*', help='List of scenario ids.')
     parser.add_argument('--recall-topk', '--topk', type=int, default=-1, help='For calculating Recall@k.')
-    parser.add_argument('--format', type=str, default="repr", help='table format to print')
-    args = parser.parse_args()
+    parser.add_argument(
+        '--format', type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help='table format to print'
+    )
+    return parser.parse_args()
 
+
+def main():
+    args = parse_args()
     textual_results: list[ScoreResult] = []
     results = []
     for scenario_id in args.scenario_ids:
