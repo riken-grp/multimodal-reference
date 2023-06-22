@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-exp_name=pretrained_b3_roberta_ja_mixed_2e_mmdialogue_4e_b8
-scenario_ids=$(cat full_annotated.txt)
+exp_name=pretrained_b5_roberta_ja_mixed_2e_mmdialogue_8e_b8
+scenario_ids=$(cat valid.txt test.txt)
 
 for scenario_id in $scenario_ids; do
   echo "Running scenario $scenario_id"
