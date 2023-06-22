@@ -93,7 +93,7 @@ class MMRefEvaluator:
                         gold_bounding_box.class_name,
                     )
                     pred_bounding_boxes: list[BoundingBoxPrediction] = sorted(
-                        [rel.bounding_box for rel in pred_relations if rel.type == relation_type],
+                        {rel.bounding_box for rel in pred_relations if rel.type == relation_type},
                         key=lambda bb: bb.confidence,
                         reverse=True,
                     )
