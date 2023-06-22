@@ -190,8 +190,7 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
         for entity in base_phrase.entities:
             current_relations.update(eid2relations[entity.eid])
         new_relations: set[RelationPrediction] = set([])
-        pas = base_phrase.pas
-        for case, arguments in pas.get_all_arguments(relax=False).items():
+        for case, arguments in base_phrase.pas.get_all_arguments(relax=False).items():
             argument_entity_ids: set[int] = set()
             for argument in arguments:
                 if isinstance(argument, EndophoraArgument):
