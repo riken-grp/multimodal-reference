@@ -53,9 +53,9 @@ def main(cfg: DictConfig) -> None:
     prediction_dir = Path(cfg.prediction_dir)
     prediction_dir.mkdir(exist_ok=True)
 
-    dataset_info = DatasetInfo.from_json(dataset_dir.joinpath('info.json').read_text())
+    dataset_info = DatasetInfo.from_json(dataset_dir.joinpath("info.json").read_text())
 
-    pred_knp_file = prediction_dir / f'{dataset_info.scenario_id}.knp'
+    pred_knp_file = prediction_dir / f"{dataset_info.scenario_id}.knp"
     if pred_knp_file.exists():
         parsed_document = Document.from_knp(pred_knp_file.read_text())
     else:
@@ -63,7 +63,7 @@ def main(cfg: DictConfig) -> None:
         pred_knp_file.write_text(parsed_document.to_knp())
 
     # perform phrase grounding with MDETR
-    phrase_grounding_file = prediction_dir / 'mdetr' / f'{parsed_document.did}.json'
+    phrase_grounding_file = prediction_dir / "mdetr" / f"{parsed_document.did}.json"
     phrase_grounding_file.parent.mkdir(exist_ok=True)
     if phrase_grounding_file.exists():
         mdetr_result = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
@@ -73,7 +73,7 @@ def main(cfg: DictConfig) -> None:
 
     parsed_document = preprocess_document(parsed_document)
     mm_reference_prediction = relax_prediction(mdetr_result, parsed_document)
-    prediction_dir.joinpath(f'{parsed_document.did}.json').write_text(
+    prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
 
@@ -83,15 +83,15 @@ def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:
         subprocess.run(
             [
                 cfg.python,
-                f'{cfg.project_root}/src/predict.py',
-                f'checkpoint={cfg.checkpoint}',
-                f'input_path={input_knp_file}',
-                f'export_dir={out_dir}',
-                'num_workers=0',
-                'devices=1',
+                f"{cfg.project_root}/src/predict.py",
+                f"checkpoint={cfg.checkpoint}",
+                f"input_path={input_knp_file}",
+                f"export_dir={out_dir}",
+                "num_workers=0",
+                "devices=1",
             ]
         )
-        return Document.from_knp(next(Path(out_dir).glob('*.knp')).read_text())
+        return Document.from_knp(next(Path(out_dir).glob("*.knp")).read_text())
 
 
 def run_mdetr(
@@ -118,23 +118,23 @@ def run_mdetr(
             for base_phrase in caption.base_phrases
         ]
         with tempfile.TemporaryDirectory() as out_dir:
-            caption_file = Path(out_dir).joinpath('caption.jpp')
+            caption_file = Path(out_dir).joinpath("caption.jpp")
             caption_file.write_text(caption.to_jumanpp())
             subprocess.run(
                 [
                     cfg.python,
-                    f'{cfg.project_root}/run_mdetr.py',
-                    f'--model={cfg.checkpoint}',
-                    f'--caption-file={caption_file}',
-                    f'--backbone-name={cfg.backbone_name}',
-                    f'--text-encoder={cfg.text_encoder}',
-                    f'--batch-size={cfg.batch_size}',
-                    f'--export-dir={out_dir}',
-                    '--image-files',
+                    f"{cfg.project_root}/run_mdetr.py",
+                    f"--model={cfg.checkpoint}",
+                    f"--caption-file={caption_file}",
+                    f"--backbone-name={cfg.backbone_name}",
+                    f"--text-encoder={cfg.text_encoder}",
+                    f"--batch-size={cfg.batch_size}",
+                    f"--export-dir={out_dir}",
+                    "--image-files",
                 ]
                 + [str(dataset_dir / image.path) for image in corresponding_images]
             )
-            predictions = [MDETRPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob('*.json'))]
+            predictions = [MDETRPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
 
         assert len(corresponding_images) == len(predictions)
         for (image, prediction), (phrase, base_phrase) in itertools.product(
@@ -144,7 +144,7 @@ def run_mdetr(
             for bounding_box in prediction.bounding_boxes:
                 prob = max(bounding_box.word_probs[m.global_index] for m in base_phrase.morphemes)
                 if prob >= 0.1:
-                    phrase.relations.append(RelationPrediction(type='=', image_id=image.id, bounding_box=bounding_box))
+                    phrase.relations.append(RelationPrediction(type="=", image_id=image.id, bounding_box=bounding_box))
         utterance_results.append(UtterancePrediction(text=caption.text, sids=utterance.sids, phrases=phrases))
 
     return PhraseGroundingPrediction(
@@ -190,8 +190,7 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
         for entity in base_phrase.entities:
             current_relations.update(eid2relations[entity.eid])
         new_relations: set[RelationPrediction] = set([])
-        pas = base_phrase.pas
-        for case, arguments in pas.get_all_arguments(relax=False).items():
+        for case, arguments in base_phrase.pas.get_all_arguments(relax=False).items():
             argument_entity_ids: set[int] = set()
             for argument in arguments:
                 if isinstance(argument, EndophoraArgument):
@@ -205,7 +204,7 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
                     RelationPrediction(type=case, image_id=rel.image_id, bounding_box=rel.bounding_box)
                     for argument_eid in argument_entity_ids
                     for rel in eid2relations[argument_eid]
-                    if rel.type == '='
+                    if rel.type == "="
                 }
             )
             # 格が一致する述語を中心とした関係の集合
@@ -214,7 +213,7 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
             for argument_eid in argument_entity_ids:
                 eid2relations[argument_eid].update(
                     {
-                        RelationPrediction(type='=', image_id=rel.image_id, bounding_box=rel.bounding_box)
+                        RelationPrediction(type="=", image_id=rel.image_id, bounding_box=rel.bounding_box)
                         for rel in case_relations
                     }
                 )
@@ -222,18 +221,85 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
             eid2relations[entity.eid].update(new_relations)
 
 
+def relax_prediction_without_coref(
+    phrase_grounding_result: PhraseGroundingPrediction,
+    parsed_document: Document,
+) -> PhraseGroundingPrediction:
+    global_index_to_relations: dict[int, set[RelationPrediction]] = defaultdict(set)
+
+    # convert phrase grounding result to eid2relations
+    sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
+    for utterance in phrase_grounding_result.utterances:
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
+            global_index_to_relations[base_phrase.global_index].update(phrase_prediction.relations)
+
+    # relax annotation until convergence
+    global_index_to_relations_prev: dict[int, set[RelationPrediction]] = {}
+    while global_index_to_relations != global_index_to_relations_prev:
+        global_index_to_relations_prev = copy.deepcopy(global_index_to_relations)
+        relax_annotation(parsed_document, global_index_to_relations)
+
+    # convert eid2relations to phrase grounding result
+    for utterance in phrase_grounding_result.utterances:
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
+            relations = set(phrase_prediction.relations)
+            relations.update(global_index_to_relations[base_phrase.global_index])
+            phrase_prediction.relations = list(relations)
+
+    return phrase_grounding_result
+
+
+def relax_annotation_without_coref(
+    document: Document, global_index_to_relations: dict[int, set[RelationPrediction]]
+) -> None:
+    for base_phrase in document.base_phrases:
+        current_relations: set[RelationPrediction] = set()  # 述語を中心とした関係の集合
+        current_relations.update(global_index_to_relations[base_phrase.global_index])
+        new_relations: set[RelationPrediction] = set([])
+        for case, arguments in base_phrase.pas.get_all_arguments(relax=False).items():
+            argument_global_indices: set[int] = set()
+            for argument in arguments:
+                if isinstance(argument, EndophoraArgument):
+                    argument_global_indices.add(argument.base_phrase.global_index)
+                elif isinstance(argument, ExophoraArgument):
+                    pass
+                else:
+                    raise AssertionError
+            new_relations.update(
+                {
+                    RelationPrediction(type=case, image_id=rel.image_id, bounding_box=rel.bounding_box)
+                    for argument_global_index in argument_global_indices
+                    for rel in global_index_to_relations[argument_global_index]
+                    if rel.type == "="
+                }
+            )
+            # 格が一致する述語を中心とした関係の集合
+            # relation の対象は argument_entity_ids と一致
+            case_relations: set[RelationPrediction] = {rel for rel in current_relations if rel.type == case}
+            for argument_global_index in argument_global_indices:
+                global_index_to_relations[argument_global_index].update(
+                    {
+                        RelationPrediction(type="=", image_id=rel.image_id, bounding_box=rel.bounding_box)
+                        for rel in case_relations
+                    }
+                )
+        global_index_to_relations[base_phrase.global_index].update(new_relations)
+
+
 def preprocess_document(document: Document) -> Document:
     for base_phrase in document.base_phrases:
         filtered = RelTagList()
         for rel_tag in base_phrase.rel_tags:
             # exclude '?' rel tags for simplicity
-            if rel_tag.mode is RelMode.AMBIGUOUS and rel_tag.target != 'なし':
+            if rel_tag.mode is RelMode.AMBIGUOUS and rel_tag.target != "なし":
                 continue
             # exclude coreference relations of 用言
             # e.g., ...を[運んで]。[それ]が終わったら...
-            if rel_tag.type == '=' and rel_tag.sid is not None:
+            if rel_tag.type == "=" and rel_tag.sid is not None:
                 if target_base_phrase := base_phrase._get_target_base_phrase(rel_tag):
-                    if ('体言' in base_phrase.features and '体言' in target_base_phrase.features) is False:
+                    if ("体言" in base_phrase.features and "体言" in target_base_phrase.features) is False:
                         continue
             filtered.append(rel_tag)
         base_phrase.rel_tags = filtered
@@ -245,5 +311,5 @@ def preprocess_document(document: Document) -> Document:
     return document
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

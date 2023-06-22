@@ -79,32 +79,32 @@ tp/recall_total/precision_total
 
 
 def test_evaluate(fixture_data_dir: Path):
-    evaluate_dir = fixture_data_dir / 'evaluate'
-    image_text_annotation = ImageTextAnnotation.from_json(evaluate_dir.joinpath('gold.json').read_text())
+    evaluate_dir = fixture_data_dir / "evaluate"
+    image_text_annotation = ImageTextAnnotation.from_json(evaluate_dir.joinpath("gold.json").read_text())
     evaluator = MMRefEvaluator(
-        DatasetInfo.from_json(evaluate_dir.joinpath('info.json').read_text()),
-        Document.from_knp(evaluate_dir.joinpath('gold.knp').read_text()),
+        DatasetInfo.from_json(evaluate_dir.joinpath("info.json").read_text()),
+        Document.from_knp(evaluate_dir.joinpath("gold.knp").read_text()),
         image_text_annotation,
     )
 
     prediction = PhraseGroundingPrediction.from_json(
-        evaluate_dir.joinpath(f'{image_text_annotation.scenario_id}.json').read_text()
+        evaluate_dir.joinpath(f"{image_text_annotation.scenario_id}.json").read_text()
     )
 
     results: list[dict[str, Any]] = evaluator.eval_visual_reference(prediction)
     df = pl.DataFrame(results)
-    df_rel = df.groupby('relation_type', maintain_order=True).sum()
+    df_rel = df.groupby("relation_type", maintain_order=True).sum()
     result = {}
-    for rel in ('ガ', 'ヲ', 'ニ', 'ノ', '='):
+    for rel in ("ガ", "ヲ", "ニ", "ノ", "="):
         result[rel] = {
             k: 0 if v.is_empty() else v.item()
-            for k, v in df_rel.filter(pl.col('relation_type') == rel)
-            .select(pl.col('recall_pos', 'recall_total', 'precision_pos', 'precision_total'))
+            for k, v in df_rel.filter(pl.col("relation_type") == rel)
+            .select(pl.col("recall_pos", "recall_total", "precision_pos", "precision_total"))
             .to_dict()
             .items()
         }
-    assert (result['ガ']['recall_pos'], result['ガ']['recall_total'], result['ガ']['precision_total']) == (4, 7, 13)
-    assert (result['ヲ']['recall_pos'], result['ヲ']['recall_total'], result['ヲ']['precision_total']) == (0, 0, 0)
-    assert (result['ニ']['recall_pos'], result['ニ']['recall_total'], result['ニ']['precision_total']) == (0, 1, 0)
-    assert (result['ノ']['recall_pos'], result['ノ']['recall_total'], result['ノ']['precision_total']) == (0, 4, 12)
-    assert (result['=']['recall_pos'], result['=']['recall_total'], result['=']['precision_total']) == (4, 9, 32)
+    assert (result["ガ"]["recall_pos"], result["ガ"]["recall_total"], result["ガ"]["precision_total"]) == (4, 7, 13)
+    assert (result["ヲ"]["recall_pos"], result["ヲ"]["recall_total"], result["ヲ"]["precision_total"]) == (0, 0, 0)
+    assert (result["ニ"]["recall_pos"], result["ニ"]["recall_total"], result["ニ"]["precision_total"]) == (0, 1, 0)
+    assert (result["ノ"]["recall_pos"], result["ノ"]["recall_total"], result["ノ"]["precision_total"]) == (0, 4, 12)
+    assert (result["="]["recall_pos"], result["="]["recall_total"], result["="]["precision_total"]) == (4, 9, 32)

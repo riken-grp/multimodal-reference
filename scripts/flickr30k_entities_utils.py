@@ -25,8 +25,8 @@ def get_sentence_data(fn):
                                     phrase belongs to
 
     """
-    with open(fn, 'r') as f:
-        sentences = f.read().split('\n')
+    with open(fn, "r") as f:
+        sentences = f.read().split("\n")
 
     annotations = []
     for sentence in sentences:
@@ -42,30 +42,30 @@ def get_sentence_data(fn):
         add_to_phrase = False
         for token in sentence.split():
             if add_to_phrase:
-                if token[-1] == ']':
+                if token[-1] == "]":
                     add_to_phrase = False
                     token = token[:-1]
                     current_phrase.append(token)
-                    phrases.append(' '.join(current_phrase))
+                    phrases.append(" ".join(current_phrase))
                     current_phrase = []
                 else:
                     current_phrase.append(token)
 
                 words.append(token)
             else:
-                if token[0] == '[':
+                if token[0] == "[":
                     add_to_phrase = True
                     first_word.append(len(words))
-                    parts = token.split('/')
+                    parts = token.split("/")
                     phrase_id.append(parts[1][3:])
                     phrase_type.append(parts[2:])
                 else:
                     words.append(token)
 
-        sentence_data = {'sentence': ' '.join(words), 'phrases': []}
+        sentence_data = {"sentence": " ".join(words), "phrases": []}
         for index, phrase, p_id, p_type in zip(first_word, phrases, phrase_id, phrase_type):
-            sentence_data['phrases'].append(
-                {'first_word_index': index, 'phrase': phrase, 'phrase_id': p_id, 'phrase_type': p_type}
+            sentence_data["phrases"].append(
+                {"first_word_index": index, "phrase": phrase, "phrase_id": p_id, "phrase_type": p_type}
             )
 
         annotations.append(sentence_data)
@@ -75,11 +75,11 @@ def get_sentence_data(fn):
 
 def get_sentence_data_ja(fn):
     # exapmle: 5:[/EN#550/clothing 赤い服]を着た4:[/EN#549/people 男]が6:[/EN#551/other 綱]を握って見守っている間に、1:[/EN#547/people 数人のクライマー]が2:[/EN#554/other 列]をなして3:[/EN#548/other 岩]をよじ登っている。
-    tag_pat = re.compile(r'\d+:\[/EN#(?P<id>\d+)(/(?P<type>[a-z]+))+ (?P<words>[^]]+)]')
+    tag_pat = re.compile(r"\d+:\[/EN#(?P<id>\d+)(/(?P<type>[a-z]+))+ (?P<words>[^]]+)]")
     annotations = []
     for line in Path(fn).read_text().splitlines():
         chunks = []
-        raw_sentence = ''
+        raw_sentence = ""
         sidx = 0
         for match in re.finditer(tag_pat, line):
             # chunk 前を追加
@@ -88,17 +88,17 @@ def get_sentence_data_ja(fn):
                 raw_sentence += text
                 chunks.append(text)
             # match の中身を追加
-            raw_sentence += match.group('words')
+            raw_sentence += match.group("words")
             chunks.append(
                 {
-                    'phrase': match.group('words'),
-                    'phrase_id': match.group('id'),
-                    'phrase_type': match.group('type'),
+                    "phrase": match.group("words"),
+                    "phrase_id": match.group("id"),
+                    "phrase_type": match.group("type"),
                 }
             )
             sidx = match.end()
         raw_sentence += line[sidx:]
-        sentence = ''
+        sentence = ""
         phrases = []
         char_idx = 0
         for chunk in chunks:
@@ -106,15 +106,15 @@ def get_sentence_data_ja(fn):
                 sentence += chunk
                 char_idx += len(chunk)
             else:
-                chunk['first_char_index'] = char_idx
-                sentence += chunk['phrase']
-                char_idx += len(chunk['phrase'])
+                chunk["first_char_index"] = char_idx
+                sentence += chunk["phrase"]
+                char_idx += len(chunk["phrase"])
                 phrases.append(chunk)
-        assert 'EN' not in sentence
+        assert "EN" not in sentence
         annotations.append(
             {
-                'sentence': sentence.strip(' '),
-                'phrases': phrases,
+                "sentence": sentence.strip(" "),
+                "phrases": phrases,
             }
         )
     return annotations
@@ -139,30 +139,30 @@ def get_annotations(fn):
     """
     tree = ET.parse(fn)
     root = tree.getroot()
-    size_container = root.findall('size')[0]
-    anno_info = {'boxes': {}, 'scene': [], 'nobox': []}
+    size_container = root.findall("size")[0]
+    anno_info = {"boxes": {}, "scene": [], "nobox": []}
     for size_element in size_container:
         anno_info[size_element.tag] = int(size_element.text)
 
-    for object_container in root.findall('object'):
-        for names in object_container.findall('name'):
+    for object_container in root.findall("object"):
+        for names in object_container.findall("name"):
             box_id = names.text
-            box_container = object_container.findall('bndbox')
+            box_container = object_container.findall("bndbox")
             if len(box_container) > 0:
-                if box_id not in anno_info['boxes']:
-                    anno_info['boxes'][box_id] = []
-                xmin = int(box_container[0].findall('xmin')[0].text) - 1
-                ymin = int(box_container[0].findall('ymin')[0].text) - 1
-                xmax = int(box_container[0].findall('xmax')[0].text) - 1
-                ymax = int(box_container[0].findall('ymax')[0].text) - 1
-                anno_info['boxes'][box_id].append([xmin, ymin, xmax, ymax])
+                if box_id not in anno_info["boxes"]:
+                    anno_info["boxes"][box_id] = []
+                xmin = int(box_container[0].findall("xmin")[0].text) - 1
+                ymin = int(box_container[0].findall("ymin")[0].text) - 1
+                xmax = int(box_container[0].findall("xmax")[0].text) - 1
+                ymax = int(box_container[0].findall("ymax")[0].text) - 1
+                anno_info["boxes"][box_id].append([xmin, ymin, xmax, ymax])
             else:
-                nobndbox = int(object_container.findall('nobndbox')[0].text)
+                nobndbox = int(object_container.findall("nobndbox")[0].text)
                 if nobndbox > 0:
-                    anno_info['nobox'].append(box_id)
+                    anno_info["nobox"].append(box_id)
 
-                scene = int(object_container.findall('scene')[0].text)
+                scene = int(object_container.findall("scene")[0].text)
                 if scene > 0:
-                    anno_info['scene'].append(box_id)
+                    anno_info["scene"].append(box_id)
 
     return anno_info
