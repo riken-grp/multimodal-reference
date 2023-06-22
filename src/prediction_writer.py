@@ -221,6 +221,73 @@ def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPr
             eid2relations[entity.eid].update(new_relations)
 
 
+def relax_prediction_without_coref(
+    phrase_grounding_result: PhraseGroundingPrediction,
+    parsed_document: Document,
+) -> PhraseGroundingPrediction:
+    global_index_to_relations: dict[int, set[RelationPrediction]] = defaultdict(set)
+
+    # convert phrase grounding result to eid2relations
+    sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
+    for utterance in phrase_grounding_result.utterances:
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
+            global_index_to_relations[base_phrase.global_index].update(phrase_prediction.relations)
+
+    # relax annotation until convergence
+    global_index_to_relations_prev: dict[int, set[RelationPrediction]] = {}
+    while global_index_to_relations != global_index_to_relations_prev:
+        global_index_to_relations_prev = copy.deepcopy(global_index_to_relations)
+        relax_annotation(parsed_document, global_index_to_relations)
+
+    # convert eid2relations to phrase grounding result
+    for utterance in phrase_grounding_result.utterances:
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
+            relations = set(phrase_prediction.relations)
+            relations.update(global_index_to_relations[base_phrase.global_index])
+            phrase_prediction.relations = list(relations)
+
+    return phrase_grounding_result
+
+
+def relax_annotation_without_coref(
+    document: Document, global_index_to_relations: dict[int, set[RelationPrediction]]
+) -> None:
+    for base_phrase in document.base_phrases:
+        current_relations: set[RelationPrediction] = set()  # 述語を中心とした関係の集合
+        current_relations.update(global_index_to_relations[base_phrase.global_index])
+        new_relations: set[RelationPrediction] = set([])
+        for case, arguments in base_phrase.pas.get_all_arguments(relax=False).items():
+            argument_global_indices: set[int] = set()
+            for argument in arguments:
+                if isinstance(argument, EndophoraArgument):
+                    argument_global_indices.add(argument.base_phrase.global_index)
+                elif isinstance(argument, ExophoraArgument):
+                    pass
+                else:
+                    raise AssertionError
+            new_relations.update(
+                {
+                    RelationPrediction(type=case, image_id=rel.image_id, bounding_box=rel.bounding_box)
+                    for argument_global_index in argument_global_indices
+                    for rel in global_index_to_relations[argument_global_index]
+                    if rel.type == "="
+                }
+            )
+            # 格が一致する述語を中心とした関係の集合
+            # relation の対象は argument_entity_ids と一致
+            case_relations: set[RelationPrediction] = {rel for rel in current_relations if rel.type == case}
+            for argument_global_index in argument_global_indices:
+                global_index_to_relations[argument_global_index].update(
+                    {
+                        RelationPrediction(type="=", image_id=rel.image_id, bounding_box=rel.bounding_box)
+                        for rel in case_relations
+                    }
+                )
+        global_index_to_relations[base_phrase.global_index].update(new_relations)
+
+
 def preprocess_document(document: Document) -> Document:
     for base_phrase in document.base_phrases:
         filtered = RelTagList()
