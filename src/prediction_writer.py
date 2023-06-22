@@ -238,7 +238,7 @@ def relax_prediction_without_coref(
     global_index_to_relations_prev: dict[int, set[RelationPrediction]] = {}
     while global_index_to_relations != global_index_to_relations_prev:
         global_index_to_relations_prev = copy.deepcopy(global_index_to_relations)
-        relax_annotation(parsed_document, global_index_to_relations)
+        relax_annotation_without_coref(parsed_document, global_index_to_relations)
 
     # convert eid2relations to phrase grounding result
     for utterance in phrase_grounding_result.utterances:
