@@ -166,7 +166,10 @@ def main():
         image_text_annotation = ImageTextAnnotation.from_json(
             args.image_annotation_dir.joinpath(f"{scenario_id}.json").read_text()
         )
-        if (prediction_file := args.prediction_dir.joinpath(f"{scenario_id}.json")).exists():
+        if (
+            args.prediction_dir is not None
+            and (prediction_file := args.prediction_dir.joinpath(f"{scenario_id}.json")).exists()
+        ):
             prediction = PhraseGroundingPrediction.from_json(prediction_file.read_text())
         else:
             prediction = None
