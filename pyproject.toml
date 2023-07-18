@@ -14,7 +14,7 @@ polars = "^0.17.15"
 pandas = "^1.5.3"
 
 [tool.poetry.group.dev.dependencies]
-ipdb = "^0.13.9"
+ipdb = "^0.13.13"
 pytest = "^7.2.0"
 
 [build-system]
