@@ -161,7 +161,7 @@ cython_debug/
 
 data
 !tests/data
-result
+result*
 /*.json
 
 *.png
