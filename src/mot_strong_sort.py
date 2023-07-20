@@ -65,7 +65,11 @@ def main():
     args = parse_args()
 
     # Tracker
-    mot_tracker = StrongSORT(model_weights=Path("resnet50_msmt17.pt"), device="cpu", fp16=False)
+    mot_tracker = StrongSORT(
+        model_weights=Path("resnet50_msmt17.pt"),
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        fp16=False,
+    )
 
     # Detection Model
     with open(args.detic_dump, mode="rb") as f:
