@@ -12,10 +12,10 @@ from rhoknp import Document
 from rhoknp.cohesion import ExophoraReferent
 
 from cohesion_scorer import ScoreResult, SubScorer
-from mdetr import BoundingBox as BoundingBoxPrediction
 from prediction_writer import PhraseGroundingPrediction
 from utils.constants import CASES
 from utils.image import BoundingBox, ImageAnnotation, ImageTextAnnotation
+from utils.mdetr import BoundingBox as BoundingBoxPrediction
 from utils.util import DatasetInfo, Rectangle, box_iou
 
 
