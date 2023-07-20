@@ -72,7 +72,10 @@ def main(cfg: DictConfig) -> None:
         phrase_grounding_file.write_text(mdetr_result.to_json(ensure_ascii=False, indent=2))
 
     parsed_document = preprocess_document(parsed_document)
-    mm_reference_prediction = relax_prediction(mdetr_result, parsed_document)
+    if cfg.coref_relaxed_prediction:
+        mm_reference_prediction = relax_prediction(mdetr_result, parsed_document)
+    else:
+        mm_reference_prediction = relax_prediction_without_coref(mdetr_result, parsed_document)
     prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
