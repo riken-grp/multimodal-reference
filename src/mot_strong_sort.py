@@ -95,7 +95,7 @@ def main():
 
         bounding_boxes: list[BoundingBox] = []
         for tracked_bb in tracked_bbs:  # xyxy, confidence, class_id, instance_id for image 0 in the batch
-            x1, y1, x2, y2, confidence, class_id, instance_id = tracked_bb.tolist()
+            x1, y1, x2, y2, instance_id, class_id, confidence = tracked_bb.tolist()
             x1, y1, x2, y2, class_id, instance_id = int(x1), int(y1), int(x2), int(y2), int(class_id), int(instance_id)
             color: list[int] = colors[class_id].tolist()
             cv2.rectangle(frame, pt1=(x1, y1), pt2=(x2, y2), color=color, thickness=5)
