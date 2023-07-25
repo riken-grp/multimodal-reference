@@ -13,7 +13,7 @@ from rhoknp import Document, Sentence
 from rhoknp.cohesion import EndophoraArgument, ExophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
-from mdetr import BoundingBox, MDETRPrediction
+from utils.mdetr import BoundingBox, MDETRPrediction
 from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo
 
 
