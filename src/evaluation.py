@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from cohesion_tools.evaluation import CohesionScore, SubCohesionScorer
 from rhoknp import Document
 from rhoknp.cohesion import ExophoraReferent
 
-from cohesion_scorer import ScoreResult, SubScorer
 from prediction_writer import PhraseGroundingPrediction
 from utils.constants import CASES
 from utils.image import BoundingBox, ImageAnnotation, ImageTextAnnotation
@@ -31,18 +31,17 @@ class MMRefEvaluator:
         self.confidence_threshold = 0.9
         self.iou_threshold = 0.5
 
-    def eval_textual_reference(self, pred_document: Document) -> ScoreResult:
-        scorer = SubScorer(
+    def eval_textual_reference(self, pred_document: Document) -> CohesionScore:
+        scorer = SubCohesionScorer(
             pred_document,
             self.gold_document,
-            cases=list(CASES),
+            pas_cases=list(CASES),
+            pas_target="all",
             bridging=True,
             coreference=True,
             exophora_referents=[ExophoraReferent(e) for e in "著者 読者 不特定:人 不特定:物".split()],
-            pas=True,
         )
-        score_result = scorer.run()
-        return score_result
+        return scorer.run()
 
     def eval_visual_reference(self, prediction: PhraseGroundingPrediction, topk: int = -1) -> list:
         recall_tracker = RatioTracker()
@@ -212,7 +211,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    textual_results: list[ScoreResult] = []
+    textual_results: list[CohesionScore] = []
     results = []
     for scenario_id in args.scenario_ids:
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())

@@ -7,12 +7,12 @@ authors = ["nobu-g <ueda-n127@hotmail.co.jp>"]
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
 tqdm = "^4.64"
-rhoknp = "~1.2.0"
+rhoknp = "^1.3"
 dataclasses-json = "^0.5.7"
 hydra-core = "^1.3.1"
 polars = "^0.17.15"
-pandas = "^1.5.3"
 opencv-python = "~4.5.5"
+cohesion-tools = { git = "https://github.com/nobu-g/cohesion-tools.git" }
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
