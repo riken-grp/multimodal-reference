@@ -9,8 +9,8 @@ from pathlib import Path
 
 import hydra
 from omegaconf import DictConfig
-from rhoknp import Document, Sentence
-from rhoknp.cohesion import EndophoraArgument, ExophoraArgument, RelMode, RelTagList
+from rhoknp import BasePhrase, Document, Sentence
+from rhoknp.cohesion import EndophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
 from utils.mdetr import BoundingBox, MDETRPrediction
@@ -72,10 +72,9 @@ def main(cfg: DictConfig) -> None:
         phrase_grounding_file.write_text(mdetr_prediction.to_json(ensure_ascii=False, indent=2))
 
     parsed_document = preprocess_document(parsed_document)
+    mm_reference_prediction = relax_prediction_with_pas_bridging(mdetr_prediction, parsed_document)
     if cfg.coref_relaxed_prediction:
-        mm_reference_prediction = relax_prediction(mdetr_prediction, parsed_document)
-    else:
-        mm_reference_prediction = relax_prediction_without_coref(mdetr_prediction, parsed_document)
+        relax_prediction_with_coreference(mdetr_prediction, parsed_document)
     prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
@@ -155,126 +154,75 @@ def run_mdetr(
     )
 
 
-def relax_prediction(
-    phrase_grounding_result: PhraseGroundingPrediction,
-    parsed_document: Document,
-) -> PhraseGroundingPrediction:
-    eid2relations: dict[int, set[RelationPrediction]] = defaultdict(set)
+def relax_prediction_with_coreference(
+    phrase_grounding_prediction: PhraseGroundingPrediction, document: Document
+) -> None:
+    sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in document.sentences}
 
-    # convert phrase grounding result to eid2relations
-    sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
-    for utterance in phrase_grounding_result.utterances:
+    phrase_id_to_relations: dict[int, set[RelationPrediction]] = defaultdict(set)
+    # convert phrase grounding result to phrase_id_to_relations
+    for utterance in phrase_grounding_prediction.utterances:
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
         for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
-            for entity in base_phrase.entities:
-                eid2relations[entity.eid].update(phrase_prediction.relations)
+            phrase_id_to_relations[base_phrase.global_index].update(phrase_prediction.relations)
+
+    for utterance in phrase_grounding_prediction.utterances:
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
+            coreferents: list[BasePhrase] = base_phrase.get_coreferents(include_nonidentical=False)
+            relations = set(phrase_prediction.relations)
+            for coreferent_base_phrase in coreferents:
+                relations.update(phrase_id_to_relations[coreferent_base_phrase.global_index])
+            phrase_prediction.relations = list(relations)
+
+
+def relax_prediction_with_pas_bridging(
+    phrase_grounding_prediction: PhraseGroundingPrediction,
+    parsed_document: Document,
+) -> PhraseGroundingPrediction:
+    phrase_id_to_relations: dict[int, set[RelationPrediction]] = defaultdict(set)
+
+    # convert phrase grounding result to phrase_id_to_relations
+    sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
+    for utterance in phrase_grounding_prediction.utterances:
+        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
+            phrase_id_to_relations[base_phrase.global_index].update(phrase_prediction.relations)
 
     # relax annotation until convergence
-    eid2relations_prev: dict[int, set[RelationPrediction]] = {}
-    while eid2relations != eid2relations_prev:
-        eid2relations_prev = copy.deepcopy(eid2relations)
-        relax_annotation(parsed_document, eid2relations)
+    phrase_id_to_relations_prev: dict[int, set[RelationPrediction]] = {}
+    while phrase_id_to_relations != phrase_id_to_relations_prev:
+        phrase_id_to_relations_prev = copy.deepcopy(phrase_id_to_relations)
+        relax_annotation_with_pas_bridging(parsed_document, phrase_id_to_relations)
 
-    # convert eid2relations to phrase grounding result
-    for utterance in phrase_grounding_result.utterances:
+    # convert phrase_id_to_relations to phrase grounding result
+    for utterance in phrase_grounding_prediction.utterances:
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
         for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
             relations = set(phrase_prediction.relations)
-            for entity in base_phrase.entities:
-                relations.update(eid2relations[entity.eid])
+            relations.update(phrase_id_to_relations[base_phrase.global_index])
             phrase_prediction.relations = list(relations)
 
-    return phrase_grounding_result
+    return phrase_grounding_prediction
 
 
-def relax_annotation(document: Document, eid2relations: dict[int, set[RelationPrediction]]) -> None:
-    for base_phrase in document.base_phrases:
-        current_relations: set[RelationPrediction] = set()  # 述語を中心とした関係の集合
-        for entity in base_phrase.entities:
-            current_relations.update(eid2relations[entity.eid])
-        new_relations: set[RelationPrediction] = set([])
-        for case, arguments in base_phrase.pas.get_all_arguments(relax=False).items():
-            argument_entity_ids: set[int] = set()
-            for argument in arguments:
-                if isinstance(argument, EndophoraArgument):
-                    argument_entity_ids.update({entity.eid for entity in argument.base_phrase.entities})
-                elif isinstance(argument, ExophoraArgument):
-                    argument_entity_ids.add(argument.eid)
-                else:
-                    raise AssertionError
-            new_relations.update(
-                {
-                    RelationPrediction(type=case, image_id=rel.image_id, bounding_box=rel.bounding_box)
-                    for argument_eid in argument_entity_ids
-                    for rel in eid2relations[argument_eid]
-                    if rel.type == "="
-                }
-            )
-            # 格が一致する述語を中心とした関係の集合
-            # relation の対象は argument_entity_ids と一致
-            case_relations: set[RelationPrediction] = {rel for rel in current_relations if rel.type == case}
-            for argument_eid in argument_entity_ids:
-                eid2relations[argument_eid].update(
-                    {
-                        RelationPrediction(type="=", image_id=rel.image_id, bounding_box=rel.bounding_box)
-                        for rel in case_relations
-                    }
-                )
-        for entity in base_phrase.entities:
-            eid2relations[entity.eid].update(new_relations)
-
-
-def relax_prediction_without_coref(
-    phrase_grounding_result: PhraseGroundingPrediction,
-    parsed_document: Document,
-) -> PhraseGroundingPrediction:
-    global_index_to_relations: dict[int, set[RelationPrediction]] = defaultdict(set)
-
-    # convert phrase grounding result to eid2relations
-    sid2sentence = {sentence.sid: sentence for sentence in parsed_document.sentences}
-    for utterance in phrase_grounding_result.utterances:
-        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
-        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
-            global_index_to_relations[base_phrase.global_index].update(phrase_prediction.relations)
-
-    # relax annotation until convergence
-    global_index_to_relations_prev: dict[int, set[RelationPrediction]] = {}
-    while global_index_to_relations != global_index_to_relations_prev:
-        global_index_to_relations_prev = copy.deepcopy(global_index_to_relations)
-        relax_annotation_without_coref(parsed_document, global_index_to_relations)
-
-    # convert eid2relations to phrase grounding result
-    for utterance in phrase_grounding_result.utterances:
-        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
-        for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
-            relations = set(phrase_prediction.relations)
-            relations.update(global_index_to_relations[base_phrase.global_index])
-            phrase_prediction.relations = list(relations)
-
-    return phrase_grounding_result
-
-
-def relax_annotation_without_coref(
-    document: Document, global_index_to_relations: dict[int, set[RelationPrediction]]
+def relax_annotation_with_pas_bridging(
+    document: Document, phrase_id_to_relations: dict[int, set[RelationPrediction]]
 ) -> None:
     for base_phrase in document.base_phrases:
         current_relations: set[RelationPrediction] = set()  # 述語を中心とした関係の集合
-        current_relations.update(global_index_to_relations[base_phrase.global_index])
+        current_relations.update(phrase_id_to_relations[base_phrase.global_index])
         new_relations: set[RelationPrediction] = set([])
         for case, arguments in base_phrase.pas.get_all_arguments(relax=False).items():
             argument_global_indices: set[int] = set()
             for argument in arguments:
                 if isinstance(argument, EndophoraArgument):
                     argument_global_indices.add(argument.base_phrase.global_index)
-                elif isinstance(argument, ExophoraArgument):
-                    pass
-                else:
-                    raise AssertionError
             new_relations.update(
                 {
                     RelationPrediction(type=case, image_id=rel.image_id, bounding_box=rel.bounding_box)
                     for argument_global_index in argument_global_indices
-                    for rel in global_index_to_relations[argument_global_index]
+                    for rel in phrase_id_to_relations[argument_global_index]
                     if rel.type == "="
                 }
             )
@@ -282,13 +230,13 @@ def relax_annotation_without_coref(
             # relation の対象は argument_entity_ids と一致
             case_relations: set[RelationPrediction] = {rel for rel in current_relations if rel.type == case}
             for argument_global_index in argument_global_indices:
-                global_index_to_relations[argument_global_index].update(
+                phrase_id_to_relations[argument_global_index].update(
                     {
                         RelationPrediction(type="=", image_id=rel.image_id, bounding_box=rel.bounding_box)
                         for rel in case_relations
                     }
                 )
-        global_index_to_relations[base_phrase.global_index].update(new_relations)
+        phrase_id_to_relations[base_phrase.global_index].update(new_relations)
 
 
 def preprocess_document(document: Document) -> Document:
