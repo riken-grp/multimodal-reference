@@ -35,11 +35,12 @@ class MMRefEvaluator:
         scorer = SubCohesionScorer(
             pred_document,
             self.gold_document,
+            exophora_referent_types=[ExophoraReferent(e).type for e in "著者 読者 不特定:人 不特定:物".split()],
             pas_cases=list(CASES),
-            pas_target="all",
+            pas_verbal=True,
+            pas_nominal=True,
             bridging=True,
             coreference=True,
-            exophora_referents=[ExophoraReferent(e) for e in "著者 読者 不特定:人 不特定:物".split()],
         )
         return scorer.run()
 
