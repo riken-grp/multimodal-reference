@@ -1,32 +1,33 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-yaml
-  - repo: https://github.com/psf/black
-    rev: 23.3.0
+      - id: check-toml
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 23.9.1
     hooks:
       - id: black
         exclude: mdetr/
   - repo: https://github.com/PyCQA/flake8
-    rev: 6.0.0
+    rev: 6.1.0
     hooks:
       - id: flake8
+        additional_dependencies: [Flake8-pyproject]
         exclude: mdetr/
   - repo: https://github.com/PyCQA/isort
     rev: 5.12.0
     hooks:
       - id: isort
-        args: [ "--profile", "black" ]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.3.0
+    rev: v1.5.1
     hooks:
       - id: mypy
         exclude: mdetr/
         additional_dependencies:
-          - rhoknp==1.2.2
-          - torch==1.13.1
+          - rhoknp==1.5.1
+          - git+https://github.com/nobu-g/cohesion-tools.git@v0.5.2
           - dataclasses-json
           - omegaconf
