@@ -66,16 +66,16 @@ def main(cfg: DictConfig) -> None:
     phrase_grounding_file = prediction_dir / "mdetr" / f"{parsed_document.did}.json"
     phrase_grounding_file.parent.mkdir(exist_ok=True)
     if phrase_grounding_file.exists():
-        mdetr_result = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
+        mdetr_prediction = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
     else:
-        mdetr_result = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
-        phrase_grounding_file.write_text(mdetr_result.to_json(ensure_ascii=False, indent=2))
+        mdetr_prediction = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
+        phrase_grounding_file.write_text(mdetr_prediction.to_json(ensure_ascii=False, indent=2))
 
     parsed_document = preprocess_document(parsed_document)
     if cfg.coref_relaxed_prediction:
-        mm_reference_prediction = relax_prediction(mdetr_result, parsed_document)
+        mm_reference_prediction = relax_prediction(mdetr_prediction, parsed_document)
     else:
-        mm_reference_prediction = relax_prediction_without_coref(mdetr_result, parsed_document)
+        mm_reference_prediction = relax_prediction_without_coref(mdetr_prediction, parsed_document)
     prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
@@ -139,7 +139,7 @@ def run_mdetr(
             )
             predictions = [MDETRPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
 
-        assert len(corresponding_images) == len(predictions)
+        assert len(corresponding_images) == len(predictions), f"{len(corresponding_images)} != {len(predictions)}"
         for (image, prediction), (phrase, base_phrase) in itertools.product(
             zip(corresponding_images, predictions),
             zip(phrases, caption.base_phrases),
