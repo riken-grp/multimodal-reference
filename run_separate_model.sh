@@ -3,7 +3,7 @@
 set -euo pipefail
 
 exp_name=pretrained_b5_roberta_ja_mixed_2e_mmdialogue_8e_b8
-scenario_ids=$(cat valid.txt test.txt)
+scenario_ids=$(cat data/id/valid.id data/id/test.id)
 
 for scenario_id in $scenario_ids; do
   echo "Running scenario $scenario_id"
