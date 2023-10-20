@@ -15,11 +15,11 @@ from utils.util import DatasetInfo
 
 # colors for visualization
 COLORS = [
-    [0.000, 0.447, 0.741],
-    [0.850, 0.325, 0.098],
-    # [0.929, 0.694, 0.125],
-    [0.494, 0.184, 0.556],
-    [0.466, 0.674, 0.188],
+    [0.000, 0.447, 0.741],  # blue
+    [0.850, 0.325, 0.098],  # orange
+    # [0.929, 0.694, 0.125],  # yellow
+    [0.494, 0.184, 0.556],  # purple
+    [0.466, 0.674, 0.188],  # green
     [0.301, 0.745, 0.933],  # light blue
 ]
 
@@ -86,7 +86,12 @@ def plot_results(
     # plt.show()
 
 
-def draw_annotation(ax, base_phrases, image_annotation, phrase_annotations):
+def draw_annotation(
+    ax: plt.Axes,
+    base_phrases: list[BasePhrase],
+    image_annotation: ImageAnnotation,
+    phrase_annotations: list[PhraseAnnotation],
+) -> None:
     for bounding_box in image_annotation.bounding_boxes:
         rect = bounding_box.rect
         labels = []
@@ -109,7 +114,14 @@ def draw_annotation(ax, base_phrases, image_annotation, phrase_annotations):
         )
 
 
-def draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk):
+def draw_prediction(
+    ax: plt.Axes,
+    base_phrases: list[BasePhrase],
+    confidence_threshold: float,
+    image_annotation: ImageAnnotation,
+    phrase_predictions: list[PhrasePrediction],
+    topk: int = -1,
+) -> None:
     colors = COLORS * 100
     for phrase_prediction in phrase_predictions:
         relation_types: set[str] = {relation.type for relation in phrase_prediction.relations}
