@@ -75,6 +75,10 @@ def main(cfg: DictConfig) -> None:
     mm_reference_prediction = relax_prediction_with_pas_bridging(mdetr_prediction, parsed_document)
     if cfg.coref_relaxed_prediction:
         relax_prediction_with_coreference(mdetr_prediction, parsed_document)
+    # sort relations by confidence
+    for utterance in mm_reference_prediction.utterances:
+        for phrase in utterance.phrases:
+            phrase.relations.sort(key=lambda rel: rel.bounding_box.confidence, reverse=True)
     prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
@@ -147,6 +151,8 @@ def run_mdetr(
                 prob = max(bounding_box.word_probs[m.global_index] for m in base_phrase.morphemes)
                 if prob >= 0.1:
                     phrase.relations.append(RelationPrediction(type="=", image_id=image.id, bounding_box=bounding_box))
+        for phrase in phrases:
+            phrase.relations.sort(key=lambda rel: rel.bounding_box.confidence, reverse=True)
         utterance_results.append(UtterancePrediction(text=caption.text, sids=utterance.sids, phrases=phrases))
 
     return PhraseGroundingPrediction(
