@@ -5,6 +5,7 @@ from utils.util import CamelCaseDataClassJsonMixin, Rectangle
 
 @dataclass(frozen=True, eq=True)
 class BoundingBox(CamelCaseDataClassJsonMixin):
+    image_id: str
     rect: Rectangle
     class_name: str
     confidence: float
@@ -16,5 +17,6 @@ class BoundingBox(CamelCaseDataClassJsonMixin):
 
 @dataclass(frozen=True)
 class MDETRPrediction(CamelCaseDataClassJsonMixin):
+    image_id: str
     bounding_boxes: list[BoundingBox]
     words: list[str]
