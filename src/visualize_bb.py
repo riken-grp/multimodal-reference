@@ -10,7 +10,7 @@ from PIL import Image, ImageFile
 from rhoknp import BasePhrase, Document, Sentence
 
 from prediction_writer import PhraseGroundingPrediction, PhrasePrediction
-from utils.image import ImageAnnotation, ImageTextAnnotation, PhraseAnnotation
+from utils.annotation import ImageAnnotation, ImageTextAnnotation, PhraseAnnotation
 from utils.util import DatasetInfo
 
 # colors for visualization

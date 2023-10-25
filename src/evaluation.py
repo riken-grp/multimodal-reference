@@ -14,8 +14,8 @@ from rhoknp.cohesion import ExophoraReferent
 
 from prediction_writer import BoundingBox as BoundingBoxPrediction
 from prediction_writer import PhraseGroundingPrediction
+from utils.annotation import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.constants import CASES
-from utils.image import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.util import DatasetInfo, Rectangle, box_iou
 
 

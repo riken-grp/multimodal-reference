@@ -6,7 +6,7 @@ from rhoknp import Document
 
 from evaluation import MMRefEvaluator
 from prediction_writer import PhraseGroundingPrediction
-from utils.image import ImageTextAnnotation
+from utils.annotation import ImageTextAnnotation
 from utils.util import DatasetInfo
 
 """
