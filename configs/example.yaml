@@ -15,6 +15,12 @@ mdetr:
   text_encoder: xlm-roberta-base
   batch_size: 16
 
+glip:
+  python: /path/to/glip/.venv/bin/python
+  project_root: /path/to/glip
+  checkpoint: /path/to/trained/glip/checkpoint
+  config: /path/to/config.yml
+
 dataset_dir: /path/to/dataset
 gold_knp_file: /path/to/gold/knp/file
 prediction_dir: /path/to/prediction
