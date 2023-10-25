@@ -125,6 +125,7 @@ def run_mdetr(
             zip(corresponding_images, predictions),
             zip(phrases, caption.base_phrases),
         ):
+            assert prediction.image_id == image.id
             for bounding_box in prediction.bounding_boxes:
                 prob = max(bounding_box.word_probs[m.global_index] for m in base_phrase.morphemes)
                 if prob >= 0.1:
