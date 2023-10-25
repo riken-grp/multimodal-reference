@@ -13,7 +13,7 @@ from rhoknp import Document
 from rhoknp.cohesion import ExophoraReferent
 
 from utils.annotation import BoundingBox, ImageAnnotation, ImageTextAnnotation
-from utils.constants import CASES
+from utils.constants import CASES, RELATION_TYPES_ALL
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import PhraseGroundingPrediction
 from utils.util import DatasetInfo, Rectangle, box_iou
@@ -195,9 +195,21 @@ class RatioTracker:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset-dir", "-d", type=Path, help="Path to the directory containing the target dataset.")
-    parser.add_argument("--gold-knp-dir", "-k", type=Path, help="Path to the gold KNP directory.")
-    parser.add_argument("--gold-image-dir", "-i", type=Path, help="Path to the gold image text annotation file.")
+    parser.add_argument(
+        "--dataset-dir",
+        "-d",
+        type=Path,
+        default="data/dataset",
+        help="Path to the directory containing the target dataset.",
+    )
+    parser.add_argument("--gold-knp-dir", "-k", type=Path, default="data/knp", help="Path to the gold KNP directory.")
+    parser.add_argument(
+        "--gold-image-dir",
+        "-i",
+        type=Path,
+        default="data/image_text_annotation",
+        help="Path to the gold image text annotation file.",
+    )
     parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction directory.")
     parser.add_argument("--scenario-ids", type=str, nargs="*", help="List of scenario ids.")
     parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
@@ -249,6 +261,14 @@ def main():
                 (df_rel["recall_pos"] / df_rel["recall_total"]).alias("recall"),
                 (df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision"),
             ]
+        )
+        # sort dataframe by relation type
+        df_rel = (
+            df_rel.with_columns(
+                df_rel["relation_type"].apply(lambda x: RELATION_TYPES_ALL.index(x)).alias("case_index")
+            )
+            .sort("case_index")
+            .drop("case_index")
         )
         print(df_to_string(df_rel, args.format))
 
