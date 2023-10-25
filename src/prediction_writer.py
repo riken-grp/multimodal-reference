@@ -4,7 +4,6 @@ import math
 import subprocess
 import tempfile
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 
 import hydra
@@ -15,43 +14,14 @@ from rhoknp.cohesion.coreference import EntityManager
 
 from utils.glip import GLIPPrediction
 from utils.mdetr import MDETRPrediction
-from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo, Rectangle
-
-
-@dataclass(frozen=True, eq=True)
-class BoundingBox(CamelCaseDataClassJsonMixin):
-    image_id: str
-    rect: Rectangle
-    confidence: float
-
-
-@dataclass(frozen=True, eq=True)
-class RelationPrediction(CamelCaseDataClassJsonMixin):
-    type: str  # ガ, ヲ, ニ, ノ, =, etc...
-    image_id: str
-    bounding_box: BoundingBox
-
-
-@dataclass
-class PhrasePrediction(CamelCaseDataClassJsonMixin):
-    sid: str
-    index: int
-    text: str
-    relations: list[RelationPrediction]
-
-
-@dataclass
-class UtterancePrediction(CamelCaseDataClassJsonMixin):
-    text: str
-    sids: list[str]
-    phrases: list[PhrasePrediction]
-
-
-@dataclass
-class PhraseGroundingPrediction(CamelCaseDataClassJsonMixin):
-    scenario_id: str
-    images: list[ImageInfo]
-    utterances: list[UtterancePrediction]
+from utils.prediction import (
+    BoundingBox,
+    PhraseGroundingPrediction,
+    PhrasePrediction,
+    RelationPrediction,
+    UtterancePrediction,
+)
+from utils.util import DatasetInfo
 
 
 @hydra.main(version_base=None, config_path="../configs")
@@ -338,7 +308,7 @@ def preprocess_document(document: Document) -> Document:
             # exclude coreference relations of 用言
             # e.g., ...を[運んで]。[それ]が終わったら...
             if rel_tag.type == "=" and rel_tag.sid is not None:
-                if target_base_phrase := base_phrase._get_target_base_phrase(rel_tag):
+                if target_base_phrase := base_phrase._get_target_base_phrase(rel_tag):  # noqa
                     if ("体言" in base_phrase.features and "体言" in target_base_phrase.features) is False:
                         continue
             filtered.append(rel_tag)

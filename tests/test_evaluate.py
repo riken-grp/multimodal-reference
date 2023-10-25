@@ -5,8 +5,8 @@ import polars as pl
 from rhoknp import Document
 
 from evaluation import MMRefEvaluator
-from prediction_writer import PhraseGroundingPrediction
 from utils.annotation import ImageTextAnnotation
+from utils.prediction import PhraseGroundingPrediction
 from utils.util import DatasetInfo
 
 """
