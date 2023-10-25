@@ -1,17 +1,5 @@
-CASES: tuple[str, ...] = (
-    "ガ",
-    "ヲ",
-    "ニ",
-    "ガ２",
-    "デ",
-    "カラ",
-)
-CASES_ALL = CASES + tuple(f"{k}≒" for k in CASES)
+CASES: list[str] = "ガ ヲ ニ ト デ カラ ヨリ ヘ マデ ガ２ ヲ２ ニ２ ト２ デ２ カラ２ ヨリ２ ヘ２ マデ２".split()
+CASES_ALL: list[str] = CASES + [f"{k}≒" for k in CASES]
 
-RELATION_TYPES: tuple[str, ...] = CASES + (
-    "ノ",
-    "ノ？",
-    "修飾",
-    "=",
-)
-RELATION_TYPES_ALL = RELATION_TYPES + tuple(f"{k}≒" for k in RELATION_TYPES)
+RELATION_TYPES: list[str] = CASES + "ノ ノ？ 修飾 トイウ =".split()
+RELATION_TYPES_ALL: list[str] = RELATION_TYPES + [f"{k}≒" for k in RELATION_TYPES]
