@@ -38,8 +38,8 @@ tp/recall_total/precision_total
     total: 2/4/19
 
   - 003
-    上: 0/1/0
-    total: 0/1/0
+    上: 0/0/0（region は除外）
+    total: 0/0/0
 
 - ガ格
   - 001
@@ -56,9 +56,9 @@ tp/recall_total/precision_total
     移動した: 0/1/0
     total: 0/1/0
 
-- ヲ格
+- ニ格
   - 003
-    移動した: 0/0/0
+    移動した: 0/0/0（「上」に対応する BB は region なので除外）
     total: 0/0/0
 
 - ノ格
@@ -105,6 +105,6 @@ def test_evaluate(fixture_data_dir: Path):
         }
     assert (result["ガ"]["recall_pos"], result["ガ"]["recall_total"], result["ガ"]["precision_total"]) == (4, 7, 13)
     assert (result["ヲ"]["recall_pos"], result["ヲ"]["recall_total"], result["ヲ"]["precision_total"]) == (0, 0, 0)
-    assert (result["ニ"]["recall_pos"], result["ニ"]["recall_total"], result["ニ"]["precision_total"]) == (0, 1, 0)
+    assert (result["ニ"]["recall_pos"], result["ニ"]["recall_total"], result["ニ"]["precision_total"]) == (0, 0, 0)
     assert (result["ノ"]["recall_pos"], result["ノ"]["recall_total"], result["ノ"]["precision_total"]) == (0, 4, 12)
-    assert (result["="]["recall_pos"], result["="]["recall_total"], result["="]["precision_total"]) == (4, 9, 32)
+    assert (result["="]["recall_pos"], result["="]["recall_total"], result["="]["precision_total"]) == (4, 8, 32)
