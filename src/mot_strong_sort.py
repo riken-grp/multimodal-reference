@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from boxmot import StrongSORT
 from cv2 import cv2
-from strongsort import StrongSORT
 
 from utils.util import CamelCaseDataClassJsonMixin
 
