@@ -234,39 +234,37 @@ def relax_prediction_with_mot(
         for bb in image_annotation.bounding_boxes:
             gold_bb_cluster[bb.instance_id].append(bb)
 
-    relation_predictions: list[RelationPrediction] = []
-    for utterance in phrase_grounding_prediction.utterances:
-        for phrase in utterance.phrases:
-            relation_predictions.extend(phrase.relations)
-
-    gold_bb_to_pred_relations_map: dict[BoundingBoxAnnotation, list[RelationPrediction]] = defaultdict(list)
-    for instance_id, gold_bbs in gold_bb_cluster.items():
-        for gold_bb in gold_bbs:
-            for relation in relation_predictions:
-                if relation.type != "=":
-                    continue
-                if relation.image_id != gold_bb.image_id:
-                    continue
-                if relation.image_id == gold_bb.image_id and box_iou(relation.bounding_box.rect, gold_bb.rect) >= 0.5:
-                    gold_bb_to_pred_relations_map[gold_bb].append(relation)
-
-    for gold_bbs in gold_bb_cluster.values():
-        relations_in_cluster: list[RelationPrediction] = []
-        for gold_bb in gold_bbs:
-            relations_in_cluster.extend(gold_bb_to_pred_relations_map[gold_bb])
-        if len(relations_in_cluster) == 0:
-            continue
-        confidences = [rel.bounding_box.confidence for rel in relations_in_cluster]
-        if confidence_modification_method == "max":
-            modified_confidence = max(confidences)
-        elif confidence_modification_method == "min":
-            modified_confidence = min(confidences)
-        elif confidence_modification_method == "mean":
-            modified_confidence = mean(confidences)
-        else:
-            raise NotImplementedError
-        for rel in relations_in_cluster:
-            rel.bounding_box.confidence = modified_confidence
+    phrase_predictions = [pp for utterance in phrase_grounding_prediction.utterances for pp in utterance.phrases]
+    for phrase_prediction in phrase_predictions:
+        for instance_id, gold_bbs in gold_bb_cluster.items():
+            # このクラスタに属する relation を集める
+            relations_in_cluster: list[RelationPrediction] = []
+            for gold_bb in gold_bbs:
+                for relation in phrase_prediction.relations:
+                    if relation.type != "=":
+                        continue
+                    if (
+                        relation.image_id == gold_bb.image_id
+                        and box_iou(relation.bounding_box.rect, gold_bb.rect) >= 0.5
+                    ):
+                        relations_in_cluster.append(relation)
+            if len(relations_in_cluster) == 0:
+                continue
+            confidences = [rel.bounding_box.confidence for rel in relations_in_cluster]
+            if confidence_modification_method == "max":
+                modified_confidence = max(confidences)
+            elif confidence_modification_method == "min":
+                modified_confidence = min(confidences)
+            elif confidence_modification_method == "mean":
+                modified_confidence = mean(confidences)
+            else:
+                raise NotImplementedError
+            print([f"{conf:.6f}" for conf in confidences])
+            for rel in relations_in_cluster:
+                print(
+                    f"{phrase_grounding_prediction.scenario_id}: {rel.image_id}: {gold_bbs[0].class_name}: confidence: {rel.bounding_box.confidence:.6f} -> {modified_confidence:.6f}"
+                )
+                rel.bounding_box.confidence = modified_confidence
 
 
 def relax_prediction_with_coreference(
