@@ -62,6 +62,21 @@ def main(cfg: DictConfig) -> None:
     elif cfg.mot_relax_mode == "gold":
         relax_prediction_with_mot(phrase_grounding_prediction, gold_annotation.images)
 
+    if cfg.coref_relax_mode is not None and cfg.mot_relax_mode is not None:
+        # prev_phrase_grounding_prediction = None
+        count = 0
+        while count < 3:
+            # prev_phrase_grounding_prediction = copy.deepcopy(phrase_grounding_prediction)
+            if cfg.coref_relax_mode == "pred":
+                relax_prediction_with_coreference(phrase_grounding_prediction, parsed_document)
+            elif cfg.coref_relax_mode == "gold":
+                relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
+            if cfg.mot_relax_mode == "pred":
+                raise NotImplementedError
+            elif cfg.mot_relax_mode == "gold":
+                relax_prediction_with_mot(phrase_grounding_prediction, gold_annotation.images)
+            count += 1
+
     # sort relations by confidence
     for utterance in mm_reference_prediction.utterances:
         for phrase in utterance.phrases:
