@@ -25,4 +25,4 @@ dataset_dir: /path/to/dataset
 gold_knp_file: /path/to/gold/knp/file
 prediction_dir: /path/to/prediction
 
-coref_relaxed_prediction: false
+coref_relax_mode: null  # null, pred, gold
