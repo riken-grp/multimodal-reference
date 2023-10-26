@@ -157,9 +157,21 @@ def draw_prediction(
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset-dir", "-d", type=Path, help="Path to the directory containing the target dataset.")
-    parser.add_argument("--gold-knp-dir", "-k", type=Path, help="Path to the gold KNP directory.")
-    parser.add_argument("--image-annotation-dir", "-i", type=Path, help="Path to the gold image text annotation file.")
+    parser.add_argument(
+        "--dataset-dir",
+        "-d",
+        type=Path,
+        default="data/dataset",
+        help="Path to the directory containing the target dataset.",
+    )
+    parser.add_argument("--gold-knp-dir", "-k", type=Path, default="data/knp", help="Path to the gold KNP directory.")
+    parser.add_argument(
+        "--image-annotation-dir",
+        "-i",
+        type=Path,
+        default="data/image_text_annotation",
+        help="Path to the gold image text annotation file.",
+    )
     parser.add_argument("--export-dir", "-e", type=Path, help="Path to the directory where tagged images are exported")
     parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction file.")
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
