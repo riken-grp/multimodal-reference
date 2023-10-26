@@ -10,6 +10,7 @@ from PIL import Image, ImageFile
 from rhoknp import BasePhrase, Document, Sentence
 
 from utils.annotation import ImageAnnotation, ImageTextAnnotation, PhraseAnnotation
+from utils.constants import RELATION_TYPES_ALL
 from utils.prediction import PhraseGroundingPrediction, PhrasePrediction
 from utils.util import DatasetInfo
 
@@ -58,6 +59,7 @@ def plot_results(
     base_phrases: list[BasePhrase],
     export_dir: Path,
     plots: list[str],
+    relation_types: set[str],
     topk: int = -1,
     confidence_threshold: float = 0.0,
 ) -> None:
@@ -66,10 +68,12 @@ def plot_results(
     ax = plt.gca()
 
     if "pred" in plots:
-        draw_prediction(ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk)
+        draw_prediction(
+            ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk, relation_types
+        )
 
     if "gold" in plots:
-        draw_annotation(ax, base_phrases, image_annotation, phrase_annotations)
+        draw_annotation(ax, base_phrases, image_annotation, phrase_annotations, relation_types)
 
     ax.text(
         -10,
@@ -91,6 +95,7 @@ def draw_annotation(
     base_phrases: list[BasePhrase],
     image_annotation: ImageAnnotation,
     phrase_annotations: list[PhraseAnnotation],
+    relation_types: set[str],
 ) -> None:
     for bounding_box in image_annotation.bounding_boxes:
         rect = bounding_box.rect
@@ -98,6 +103,8 @@ def draw_annotation(
         for phrase_annotation in phrase_annotations:
             base_phrase = next(filter(lambda bp: bp.text == phrase_annotation.text, base_phrases))
             for relation in phrase_annotation.relations:
+                if relation.type not in relation_types:
+                    continue
                 if relation.instance_id == bounding_box.instance_id:
                     labels.append(f"{relation.type}_{get_core_expression(base_phrase)[1]}")
         if not labels:
@@ -120,12 +127,13 @@ def draw_prediction(
     confidence_threshold: float,
     image_annotation: ImageAnnotation,
     phrase_predictions: list[PhrasePrediction],
-    topk: int = -1,
+    topk: int,
+    relation_types: set[str],
 ) -> None:
     colors = COLORS * 100
     for phrase_prediction in phrase_predictions:
-        relation_types: set[str] = {relation.type for relation in phrase_prediction.relations}
-        for relation_type in relation_types:
+        target_relation_types: set[str] = {relation.type for relation in phrase_prediction.relations} & relation_types
+        for relation_type in target_relation_types:
             relations = [
                 r
                 for r in phrase_prediction.relations
@@ -175,7 +183,18 @@ def parse_args():
     parser.add_argument("--export-dir", "-e", type=Path, help="Path to the directory where tagged images are exported")
     parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction file.")
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
-    parser.add_argument("--plots", type=str, nargs="*", choices=["gold", "pred"], help="Plotting target.")
+    parser.add_argument(
+        "--plots", type=str, nargs="*", choices=["gold", "pred"], default=["gold", "pred"], help="Plotting target."
+    )
+    parser.add_argument(
+        "--relation-types",
+        "--rels",
+        type=str,
+        nargs="*",
+        choices=RELATION_TYPES_ALL,
+        default=RELATION_TYPES_ALL,
+        help="Relation types to plot.",
+    )
     return parser.parse_args()
 
 
@@ -197,7 +216,16 @@ def main():
             prediction = PhraseGroundingPrediction.from_json(prediction_file.read_text())
         else:
             prediction = None
-        visualize(export_dir, dataset_info, gold_document, image_dir, image_text_annotation, prediction, args.plots)
+        visualize(
+            export_dir,
+            dataset_info,
+            gold_document,
+            image_dir,
+            image_text_annotation,
+            prediction,
+            args.plots,
+            args.relation_types,
+        )
 
 
 def visualize(
@@ -208,6 +236,7 @@ def visualize(
     image_text_annotation: ImageTextAnnotation,
     prediction: Optional[PhraseGroundingPrediction],
     plots: list[str],
+    relation_types: list[str],
 ) -> None:
     utterance_annotations = image_text_annotation.utterances
     image_id_to_annotation = {
@@ -239,6 +268,7 @@ def visualize(
                 export_dir,
                 confidence_threshold=0.9,
                 plots=plots,
+                relation_types=set(relation_types),
             )
 
 
