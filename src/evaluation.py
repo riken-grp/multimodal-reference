@@ -115,7 +115,10 @@ class MMRefEvaluator:
                 # precision
                 for rel_idx, pred_relation in enumerate(pred_relations):
                     relation_type = pred_relation.type
-                    gold_relations = [rel for rel in phrase_annotation.relations if rel.type == relation_type]
+                    # allow ≒ relations
+                    gold_relations = [
+                        rel for rel in phrase_annotation.relations if rel.type in (relation_type, relation_type + "≒")
+                    ]
                     if pred_relation.bounding_box.confidence < self.confidence_threshold:
                         continue
                     pred_box: Rectangle = pred_relation.bounding_box.rect
