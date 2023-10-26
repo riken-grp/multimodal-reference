@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 from collections import defaultdict
 from pathlib import Path
+from statistics import mean
 
 import hydra
 from omegaconf import DictConfig
@@ -12,6 +13,8 @@ from rhoknp import BasePhrase, Document, Sentence
 from rhoknp.cohesion import EndophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
+from utils.annotation import BoundingBox as BoundingBoxAnnotation
+from utils.annotation import ImageAnnotation, ImageTextAnnotation
 from utils.glip import GLIPPrediction
 from utils.mdetr import MDETRPrediction
 from utils.prediction import (
@@ -21,38 +24,44 @@ from utils.prediction import (
     RelationPrediction,
     UtterancePrediction,
 )
-from utils.util import DatasetInfo
+from utils.util import DatasetInfo, box_iou
 
 
 @hydra.main(version_base=None, config_path="../configs")
 def main(cfg: DictConfig) -> None:
     dataset_dir = Path(cfg.dataset_dir)
-    gold_knp_file = Path(cfg.gold_knp_file)  # TODO: remove gold tags just in case
+    gold_knp_file = Path(cfg.gold_knp_file)
+    gold_annotation_file = Path(cfg.gold_annotation_file)
     prediction_dir = Path(cfg.prediction_dir)
     prediction_dir.mkdir(exist_ok=True)
 
     dataset_info = DatasetInfo.from_json(dataset_dir.joinpath("info.json").read_text())
+    gold_document = Document.from_knp(gold_knp_file.read_text())
+    gold_annotation = ImageTextAnnotation.from_json(gold_annotation_file.read_text())
 
     pred_knp_file = prediction_dir / f"{dataset_info.scenario_id}.knp"
-    if pred_knp_file.exists():
-        parsed_document = Document.from_knp(pred_knp_file.read_text())
-    else:
-        parsed_document = run_cohesion(cfg.cohesion, gold_knp_file)
-        pred_knp_file.write_text(parsed_document.to_knp())
+    assert pred_knp_file.exists()
+    parsed_document = Document.from_knp(pred_knp_file.read_text())
 
     # perform phrase grounding with MDETR
     phrase_grounding_file = prediction_dir / "mdetr" / f"{parsed_document.did}.json"
     phrase_grounding_file.parent.mkdir(exist_ok=True)
-    if phrase_grounding_file.exists():
-        mdetr_prediction = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
-    else:
-        mdetr_prediction = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
-        phrase_grounding_file.write_text(mdetr_prediction.to_json(ensure_ascii=False, indent=2))
+    assert phrase_grounding_file.exists()
+    phrase_grounding_prediction = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
 
     parsed_document = preprocess_document(parsed_document)
-    mm_reference_prediction = relax_prediction_with_pas_bridging(mdetr_prediction, parsed_document)
-    if cfg.coref_relaxed_prediction:
-        relax_prediction_with_coreference(mdetr_prediction, parsed_document)
+    mm_reference_prediction = relax_prediction_with_pas_bridging(phrase_grounding_prediction, parsed_document)
+
+    if cfg.coref_relax_mode == "pred":
+        relax_prediction_with_coreference(phrase_grounding_prediction, parsed_document)
+    elif cfg.coref_relax_mode == "gold":
+        relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
+
+    if cfg.mot_relax_mode == "pred":
+        raise NotImplementedError
+    elif cfg.mot_relax_mode == "gold":
+        relax_prediction_with_mot(phrase_grounding_prediction, gold_annotation.images)
+
     # sort relations by confidence
     for utterance in mm_reference_prediction.utterances:
         for phrase in utterance.phrases:
@@ -212,6 +221,52 @@ def run_glip(
     return PhraseGroundingPrediction(
         scenario_id=dataset_info.scenario_id, images=dataset_info.images, utterances=utterance_predictions
     )
+
+
+def relax_prediction_with_mot(
+    phrase_grounding_prediction: PhraseGroundingPrediction,
+    image_annotations: list[ImageAnnotation],
+    confidence_modification_method: str = "max",  # min, max, mean
+) -> None:
+    # create a bounding box cluster according to instance_id
+    gold_bb_cluster: dict[str, list[BoundingBoxAnnotation]] = defaultdict(list)
+    for image_annotation in image_annotations:
+        for bb in image_annotation.bounding_boxes:
+            gold_bb_cluster[bb.instance_id].append(bb)
+
+    relation_predictions: list[RelationPrediction] = []
+    for utterance in phrase_grounding_prediction.utterances:
+        for phrase in utterance.phrases:
+            relation_predictions.extend(phrase.relations)
+
+    gold_bb_to_pred_relations_map: dict[BoundingBoxAnnotation, list[RelationPrediction]] = defaultdict(list)
+    for instance_id, gold_bbs in gold_bb_cluster.items():
+        for gold_bb in gold_bbs:
+            for relation in relation_predictions:
+                if relation.type != "=":
+                    continue
+                if relation.image_id != gold_bb.image_id:
+                    continue
+                if relation.image_id == gold_bb.image_id and box_iou(relation.bounding_box.rect, gold_bb.rect) >= 0.5:
+                    gold_bb_to_pred_relations_map[gold_bb].append(relation)
+
+    for gold_bbs in gold_bb_cluster.values():
+        relations_in_cluster: list[RelationPrediction] = []
+        for gold_bb in gold_bbs:
+            relations_in_cluster.extend(gold_bb_to_pred_relations_map[gold_bb])
+        if len(relations_in_cluster) == 0:
+            continue
+        confidences = [rel.bounding_box.confidence for rel in relations_in_cluster]
+        if confidence_modification_method == "max":
+            modified_confidence = max(confidences)
+        elif confidence_modification_method == "min":
+            modified_confidence = min(confidences)
+        elif confidence_modification_method == "mean":
+            modified_confidence = mean(confidences)
+        else:
+            raise NotImplementedError
+        for rel in relations_in_cluster:
+            rel.bounding_box.confidence = modified_confidence
 
 
 def relax_prediction_with_coreference(

@@ -3,11 +3,14 @@ from dataclasses import dataclass
 from utils.util import CamelCaseDataClassJsonMixin, ImageInfo, Rectangle
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(eq=True)
 class BoundingBox(CamelCaseDataClassJsonMixin):
     image_id: str
     rect: Rectangle
     confidence: float
+
+    def __hash__(self) -> int:
+        return hash((self.image_id, self.rect))
 
 
 @dataclass(frozen=True, eq=True)
