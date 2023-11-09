@@ -3,8 +3,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from flickr30k_entities_utils import get_annotations, get_sentence_data, get_sentence_data_ja
 from tqdm import tqdm
+
+from flickr30k_entities_utils import get_annotations, get_sentence_data, get_sentence_data_ja
 
 
 def convert(

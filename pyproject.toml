@@ -7,11 +7,11 @@ authors = ["nobu-g <ueda-n127@hotmail.co.jp>"]
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
 tqdm = "^4.64"
-rhoknp = "~1.5.1"
+rhoknp = "~1.6.0"
 dataclasses-json = "^0.6.1"
 hydra-core = "^1.3.1"
 polars = "^0.18.15"
-cohesion-tools = { git = "https://github.com/nobu-g/cohesion-tools.git", tag = "v0.5.3" }
+cohesion-tools = "^0.5.7"
 matplotlib = "^3.8"
 boxmot = "^10.0.43"
 
@@ -19,22 +19,41 @@ boxmot = "^10.0.43"
 ipdb = "^0.13.13"
 pytest = "^7.2.0"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
 [tool.black]
 line-length = 120
 target-version = ["py39", "py310"]
 
-[tool.isort]
-line_length = 120
-py_version = 39
-profile = "black"
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py39"  # The minimum Python version to target
+src = ["src", "scripts"]
+ignore = [
+    "PLR0912",  # Too many branches
+    "PLR0913",  # Too many arguments in function definition
+    "PLR0915",  # Too many statements
+    "PLR2004",  # Magic value used in comparison
+    "E501",  # Line too long
+    "RUF001",  # String contains ambiguous `ノ` (KATAKANA LETTER NO). Did you mean `/` (SOLIDUS)?
+    "RUF002",  # Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+    "RUF003",  # Comment contains ambiguous `ノ` (KATAKANA LETTER NO). Did you mean `/` (SOLIDUS)?
+    "COM812",  # Trailing comma missing
+    "ANN002",  # Missing type annotation for `*args`
+    "ANN003",  # Missing type annotation for `**kwargs`
+    "ANN101",  # Missing type annotation for `self` in method
+    "ANN102",  # Missing type annotation for `cls` in classmethod
+]
+select = ["F", "E", "W", "I", "B", "PL", "PD", "NPY", "RUF", "UP", "TID", "COM", "PT", "ARG", "PYI"]
 
-[tool.flake8]
-ignore = ["E203", "E501", "W503"]
-max-line-length = 120
+[tool.ruff.per-file-ignores]
+"tests/*" = ["ANN"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
 
 [tool.mypy]
 python_version = 3.9
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

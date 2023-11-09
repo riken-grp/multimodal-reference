@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from scripts.convert_dataset import convert  # noqa: E402
-from scripts.flickr30k_entities_utils import get_annotations, get_sentence_data  # noqa: E402
+from scripts.convert_dataset import convert
+from scripts.flickr30k_entities_utils import get_annotations, get_sentence_data
 
 here = Path(__file__).resolve().parent
 data_dir = here / "data"
