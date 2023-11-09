@@ -1,45 +1,14 @@
 import argparse
 import json
 import pickle
-from dataclasses import dataclass
 from pathlib import Path
 
+import cv2
 import numpy as np
 import torch
 from boxmot import StrongSORT
-from cv2 import cv2
 
-from utils.util import CamelCaseDataClassJsonMixin
-
-
-@dataclass(frozen=True)
-class BoundingBox(CamelCaseDataClassJsonMixin):
-    x1: int
-    y1: int
-    x2: int
-    y2: int
-    confidence: float
-    class_id: int
-    instance_id: int
-
-    @property
-    def w(self) -> int:
-        return self.x2 - self.x1
-
-    @property
-    def h(self) -> int:
-        return self.y2 - self.y1
-
-
-@dataclass(frozen=True)
-class Frame(CamelCaseDataClassJsonMixin):
-    bounding_boxes: list[BoundingBox]
-
-
-@dataclass(frozen=True)
-class DetectionLabels(CamelCaseDataClassJsonMixin):
-    frames: list[Frame]
-    classes: list[str]
+from utils.mot import BoundingBox, DetectionLabels, Frame
 
 
 def parse_args():
@@ -66,7 +35,7 @@ def main():
 
     # Tracker
     mot_tracker = StrongSORT(
-        model_weights=Path("resnet50_msmt17.pt"),
+        model_weights=Path("osnet_ain_x1_0_msmt17.pt"),
         device="cuda" if torch.cuda.is_available() else "cpu",
         fp16=False,
     )
@@ -87,16 +56,16 @@ def main():
         frame: np.ndarray  # (h, w, 3)
         if idx >= len(detic_dump):
             break
-        # print(detic_dump[idx][1])  # xyxy, confidence, class for image 0 in the batch
         raw_bbs: np.ndarray = detic_dump[idx]  # (bb, 6)
         if len(raw_bbs.shape) != 2 or raw_bbs.shape[1] != 6:
             raw_bbs = np.empty((0, 6))
 
-        tracked_bbs: np.ndarray = mot_tracker.update(torch.as_tensor(raw_bbs), frame)  # (bb, 7)
+        tracked_bbs: np.ndarray = mot_tracker.update(raw_bbs, frame)  # (bb, 7)
 
         bounding_boxes: list[BoundingBox] = []
-        for tracked_bb in tracked_bbs:  # xyxy, confidence, class_id, instance_id for image 0 in the batch
-            x1, y1, x2, y2, instance_id, class_id, confidence = tracked_bb.tolist()
+        for tracked_bb in tracked_bbs:
+            # https://github.com/mikel-brostrom/yolo_tracking#custom-object-detection-model-example
+            x1, y1, x2, y2, instance_id, confidence, class_id, _ = tracked_bb.tolist()
             x1, y1, x2, y2, class_id, instance_id = int(x1), int(y1), int(x2), int(y2), int(class_id), int(instance_id)
             color: list[int] = colors[class_id].tolist()
             cv2.rectangle(frame, pt1=(x1, y1), pt2=(x2, y2), color=color, thickness=5)
