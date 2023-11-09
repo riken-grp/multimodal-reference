@@ -25,7 +25,7 @@ def get_sentence_data(fn):
                                     phrase belongs to
 
     """
-    with open(fn, "r") as f:
+    with open(fn) as f:
         sentences = f.read().split("\n")
 
     annotations = []
@@ -44,15 +44,16 @@ def get_sentence_data(fn):
             if add_to_phrase:
                 if token[-1] == "]":
                     add_to_phrase = False
-                    token = token[:-1]
-                    current_phrase.append(token)
+                    phrase = token[:-1]
+                    current_phrase.append(phrase)
                     phrases.append(" ".join(current_phrase))
                     current_phrase = []
                 else:
-                    current_phrase.append(token)
+                    phrase = token
+                    current_phrase.append(phrase)
 
-                words.append(token)
-            else:
+                words.append(phrase)
+            else:  # noqa: PLR5501
                 if token[0] == "[":
                     add_to_phrase = True
                     first_word.append(len(words))
@@ -84,7 +85,7 @@ def get_sentence_data_ja(fn):
         for match in re.finditer(tag_pat, line):
             # chunk 前を追加
             if sidx < match.start():
-                text = line[sidx : match.start()]  # noqa
+                text = line[sidx : match.start()]
                 raw_sentence += text
                 chunks.append(text)
             # match の中身を追加

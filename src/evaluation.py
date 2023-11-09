@@ -222,6 +222,7 @@ def parse_args():
     parser.add_argument(
         "--format", type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help="table format to print"
     )
+    parser.add_argument("--raw-result-csv", type=Path, default=None, help="Path to the raw result csv file.")
     return parser.parse_args()
 
 
@@ -250,12 +251,14 @@ def main():
             result = {"scenario_id": scenario_id}
             result.update(row)
             results.append(result)
-    df = pl.DataFrame(results)
-    df.drop_in_place("scenario_id")
+    result_df = pl.DataFrame(results)
+    if args.raw_result_csv is not None:
+        result_df.write_csv(args.raw_result_csv)
+    result_df.drop_in_place("scenario_id")
 
     if "rel" in args.eval_modes:
         df_rel = (
-            df.groupby("relation_type", maintain_order=True)
+            result_df.groupby("relation_type", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "instance_id", "class_name"])
         )
@@ -277,7 +280,7 @@ def main():
 
     if "class" in args.eval_modes:
         df_class = (
-            df.filter(pl.col("relation_type") == "=")
+            result_df.filter(pl.col("relation_type") == "=")
             .groupby("class_name", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id"])

@@ -97,7 +97,8 @@ def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:
                 f"export_dir={out_dir}",
                 "num_workers=0",
                 "devices=1",
-            ]
+            ],
+            check=True,
         )
         return Document.from_knp(next(Path(out_dir).glob("*.knp")).read_text())
 
@@ -140,7 +141,8 @@ def run_mdetr(
                     f"--export-dir={out_dir}",
                     "--image-files",
                 ]
-                + [str(dataset_dir / image.path) for image in corresponding_images]
+                + [str(dataset_dir / image.path) for image in corresponding_images],
+                check=True,
             )
             predictions = [MDETRPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
 
@@ -209,7 +211,8 @@ def run_glip(
                     f"--export-dir={out_dir}",
                     "--image-files",
                 ]
-                + [str(dataset_dir / image.path) for image in corresponding_images]
+                + [str(dataset_dir / image.path) for image in corresponding_images],
+                check=True,
             )
             predictions = [GLIPPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
 
@@ -251,7 +254,7 @@ def relax_prediction_with_mot(
 
     phrase_predictions = [pp for utterance in phrase_grounding_prediction.utterances for pp in utterance.phrases]
     for phrase_prediction in phrase_predictions:
-        for instance_id, gold_bbs in gold_bb_cluster.items():
+        for gold_bbs in gold_bb_cluster.values():
             # このクラスタに属する relation を集める
             relations_in_cluster: list[RelationPrediction] = []
             for gold_bb in gold_bbs:
@@ -377,7 +380,7 @@ def preprocess_document(document: Document) -> Document:
             # exclude coreference relations of 用言
             # e.g., ...を[運んで]。[それ]が終わったら...
             if rel_tag.type == "=" and rel_tag.sid is not None:
-                if target_base_phrase := base_phrase._get_target_base_phrase(rel_tag):  # noqa
+                if target_base_phrase := base_phrase._get_target_base_phrase(rel_tag):
                     if ("体言" in base_phrase.features and "体言" in target_base_phrase.features) is False:
                         continue
             filtered.append(rel_tag)

@@ -76,7 +76,8 @@ def main():
         detic_dump: list[np.ndarray] = pickle.load(f)
     class_names: list[str] = json.loads(Path("lvis_categories.json").read_text())
 
-    colors: np.ndarray = (np.random.rand(len(class_names) * 3) * 255).astype(np.uint8).reshape(-1, 3)  # (names, 3)
+    rng = np.random.default_rng(1337)
+    colors: np.ndarray = (rng.random(len(class_names) * 3) * 255).astype(np.uint8).reshape(-1, 3)  # (names, 3)
 
     video = cv2.VideoCapture(str(args.video))
 

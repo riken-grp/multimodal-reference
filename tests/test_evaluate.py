@@ -92,8 +92,8 @@ def test_evaluate(fixture_data_dir: Path):
     )
 
     results: list[dict[str, Any]] = evaluator.eval_visual_reference(prediction)
-    df = pl.DataFrame(results)
-    df_rel = df.groupby("relation_type", maintain_order=True).sum()
+    result_df = pl.DataFrame(results)
+    df_rel = result_df.groupby("relation_type", maintain_order=True).sum()
     result = {}
     for rel in ("ガ", "ヲ", "ニ", "ノ", "="):
         result[rel] = {
