@@ -125,7 +125,8 @@ def run_mot(cfg: DictConfig, scenario_id: str) -> DetectionLabels:
                 f"{cfg.detic_dump_dir}/{scenario_id}.npy",
                 "--output-json",
                 f"{out_dir}/mot.json",
-            ]
+            ],
+            check=True,
         )
         return DetectionLabels.from_json(Path(out_dir).joinpath("mot.json").read_text())
 
@@ -147,7 +148,7 @@ def run_mdetr(
         phrases: list[PhrasePrediction] = [
             PhrasePrediction(
                 sid=base_phrase.sentence.sid,
-                index=base_phrase.index,
+                index=base_phrase.global_index,
                 text=base_phrase.text,
                 relations=[],
             )
@@ -219,7 +220,7 @@ def run_glip(
         phrases: list[PhrasePrediction] = [
             PhrasePrediction(
                 sid=base_phrase.sentence.sid,
-                index=base_phrase.index,
+                index=base_phrase.global_index,
                 text=base_phrase.text,
                 relations=[],
             )
