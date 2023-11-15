@@ -7,12 +7,15 @@ work_dir: ${hydra:runtime.cwd}
 
 # name of the run is accessed by loggers
 # should be used along with experiment mode
-name: ${hydra:job.config_name}-${hydra:job.override_dirname}
+name: default
 
-exp_dir: ${work_dir}/result/${name}
+exp_dir: ${work_dir}/result/mmref/${name}
 config_name: ${hydra:job.config_name}
 
 hydra:
+  output_subdir: null
+  # hydra_logging: null
+  # job_logging: null
   run:
     dir: ${exp_dir}
   sweep:

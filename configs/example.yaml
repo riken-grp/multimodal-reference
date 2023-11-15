@@ -1,28 +1,15 @@
 defaults:
   - base.yaml
+  - cohesion: example.yaml
+  - mdetr: example.yaml
+  - glip: example.yaml
+  - mot: example.yaml
   - _self_
 
-cohesion:
-  python: /path/to/cohesion/.venv/bin/python
-  project_root: /path/to/cohesion
-  checkpoint: /path/to/trained/cohesion/checkpoint
-
-mdetr:
-  python: /path/to/mdetr/.venv/bin/python
-  project_root: /path/to/mdetr
-  checkpoint: /path/to/trained/mdetr/checkpoint
-  backbone_name: timm_tf_efficientnet_b3_ns
-  text_encoder: xlm-roberta-base
-  batch_size: 16
-
-glip:
-  python: /path/to/glip/.venv/bin/python
-  project_root: /path/to/glip
-  checkpoint: /path/to/trained/glip/checkpoint
-  config: /path/to/config.yml
-
 dataset_dir: /path/to/dataset
-gold_knp_file: /path/to/gold/knp/file
-prediction_dir: /path/to/prediction
+gold_knp_dir: /path/to/gold/knp/file
+gold_annotation_dir: /path/to/gold/annotation
 
+phrase_grounding_model: glip  # mdetr, glip
 coref_relax_mode: null  # null, pred, gold
+mot_relax_mode: null  # null, pred, gold
