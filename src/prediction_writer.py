@@ -9,11 +9,13 @@ from statistics import mean
 from typing import Union
 
 import hydra
+import luigi
 from omegaconf import DictConfig
 from rhoknp import BasePhrase, Document, Sentence
 from rhoknp.cohesion import EndophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
+from tasks import CohesionAnalysis
 from utils.annotation import BoundingBox as BoundingBoxAnnotation
 from utils.annotation import ImageAnnotation, ImageTextAnnotation
 from utils.glip import GLIPPrediction
@@ -42,15 +44,18 @@ def main(cfg: DictConfig) -> None:
     gold_document = Document.from_knp(gold_knp_file.read_text())
     gold_annotation = ImageTextAnnotation.from_json(gold_annotation_file.read_text())
 
-    pred_knp_file = prediction_dir / f"{scenario_id}.knp"
-    assert pred_knp_file.exists()
-    parsed_document = Document.from_knp(pred_knp_file.read_text())
+    cohesion_analysis = CohesionAnalysis(cfg=cfg.cohesion, scenario_id=scenario_id)
+    luigi.build([cohesion_analysis], local_scheduler=True)
+    parsed_document = Document.from_knp(cohesion_analysis.output().open(mode="r").read())
 
     # perform phrase grounding with MDETR
     phrase_grounding_file = prediction_dir / "mdetr" / f"{scenario_id}.json"
     phrase_grounding_file.parent.mkdir(exist_ok=True)
-    assert phrase_grounding_file.exists()
-    phrase_grounding_prediction = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
+    if phrase_grounding_file.exists():
+        phrase_grounding_prediction = PhraseGroundingPrediction.from_json(phrase_grounding_file.read_text())
+    else:
+        phrase_grounding_prediction = run_mdetr(cfg.mdetr, dataset_info, dataset_dir, parsed_document)
+        phrase_grounding_file.write_text(phrase_grounding_prediction.to_json(ensure_ascii=False, indent=2))
 
     parsed_document = preprocess_document(parsed_document)
     mm_reference_prediction = relax_prediction_with_pas_bridging(phrase_grounding_prediction, parsed_document)
@@ -60,8 +65,8 @@ def main(cfg: DictConfig) -> None:
     elif cfg.coref_relax_mode == "gold":
         relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
 
+    mot_file = prediction_dir / "mot" / f"{scenario_id}.json"
     if cfg.mot_relax_mode == "pred":
-        mot_file = prediction_dir / "mot" / f"{scenario_id}.json"
         if not mot_file.exists():
             mot_result = run_mot(cfg.mot, scenario_id)
             mot_file.parent.mkdir(exist_ok=True)
@@ -95,23 +100,6 @@ def main(cfg: DictConfig) -> None:
     prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
-
-
-def run_cohesion(cfg: DictConfig, input_knp_file: Path) -> Document:
-    with tempfile.TemporaryDirectory() as out_dir:
-        subprocess.run(
-            [
-                cfg.python,
-                f"{cfg.project_root}/src/predict.py",
-                f"checkpoint={cfg.checkpoint}",
-                f"input_path={input_knp_file}",
-                f"export_dir={out_dir}",
-                "num_workers=0",
-                "devices=1",
-            ],
-            check=True,
-        )
-        return Document.from_knp(next(Path(out_dir).glob("*.knp")).read_text())
 
 
 def run_mot(cfg: DictConfig, scenario_id: str) -> DetectionLabels:
@@ -248,7 +236,7 @@ def run_glip(
         for image, prediction in zip(corresponding_images, predictions):
             for phrase, phrase_prediction in zip(phrases, prediction.phrases):
                 assert phrase_prediction.text == phrase.text
-                assert phrase_prediction.phrase_index == phrase.index
+                assert phrase_prediction.index == phrase.index
                 for bounding_box in phrase_prediction.bounding_boxes:
                     assert bounding_box.image_id == image.id
                     phrase.relations.append(
@@ -278,7 +266,7 @@ def relax_prediction_with_mot(
     gold_bb_cluster: dict[str, list[BoundingBoxAnnotation]] = defaultdict(list)
     if isinstance(image_annotations, DetectionLabels):
         for idx in range(math.ceil(len(image_annotations.frames) / 30)):
-            frame = image_annotations.frames[idx * 30]  # TODO: identify exact frame
+            frame = image_annotations.frames[idx * 30]
             for bb in frame.bounding_boxes:
                 gold_bb_cluster[str(bb.instance_id)].append(
                     BoundingBoxAnnotation(
@@ -290,8 +278,8 @@ def relax_prediction_with_mot(
                 )
     else:
         for image_annotation in image_annotations:
-            for bb in image_annotation.bounding_boxes:
-                gold_bb_cluster[bb.instance_id].append(bb)
+            for gold_bb in image_annotation.bounding_boxes:
+                gold_bb_cluster[gold_bb.instance_id].append(gold_bb)
 
     phrase_predictions = [pp for utterance in phrase_grounding_prediction.utterances for pp in utterance.phrases]
     for phrase_prediction in phrase_predictions:
