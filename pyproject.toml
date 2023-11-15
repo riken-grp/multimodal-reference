@@ -14,6 +14,7 @@ polars = "^0.18.15"
 cohesion-tools = "^0.5.7"
 matplotlib = "^3.8"
 boxmot = "^10.0.43"
+luigi = "^3.4.0"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
