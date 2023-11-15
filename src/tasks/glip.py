@@ -34,7 +34,7 @@ class GLIPPhraseGrounding(luigi.Task):
     def run(self):
         prediction = run_glip(
             self.cfg,
-            dataset_dir=self.dataset_dir / self.scenario_id,
+            dataset_dir=self.dataset_dir,
             document=self.document,
         )
         with self.output().open(mode="w") as f:

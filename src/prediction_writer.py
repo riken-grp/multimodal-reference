@@ -1,7 +1,5 @@
 import copy
 import math
-import subprocess
-import tempfile
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean
@@ -14,28 +12,25 @@ from rhoknp import BasePhrase, Document, Sentence
 from rhoknp.cohesion import EndophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
-from tasks import CohesionAnalysis, MDETRPhraseGrounding, MultipleObjectTracking
+from tasks import CohesionAnalysis, GLIPPhraseGrounding, MDETRPhraseGrounding, MultipleObjectTracking
 from utils.annotation import BoundingBox as BoundingBoxAnnotation
 from utils.annotation import ImageAnnotation, ImageTextAnnotation
-from utils.glip import GLIPPrediction
 from utils.mot import DetectionLabels
-from utils.prediction import BoundingBox as BoundingBoxPrediction
-from utils.prediction import (
-    PhraseGroundingPrediction,
-    PhrasePrediction,
-    RelationPrediction,
-    UtterancePrediction,
-)
-from utils.util import DatasetInfo, box_iou
+from utils.prediction import PhraseGroundingPrediction, RelationPrediction
+from utils.util import box_iou
 
 
 @hydra.main(version_base=None, config_path="../configs")
 def main(cfg: DictConfig) -> None:
     dataset_dir = Path(cfg.dataset_dir)
-    prediction_dir = Path(cfg.prediction_dir)
-    prediction_dir.mkdir(exist_ok=True)
+    exp_dir = Path(cfg.exp_dir)
+    exp_dir.mkdir(exist_ok=True)
+    for scenario_id in cfg.scenario_ids:
+        run_prediction(cfg, scenario_id, dataset_dir=dataset_dir / scenario_id, prediction_dir=exp_dir)
 
-    gold_document = Document.from_knp(Path(cfg.gold_knp_file).read_text())
+
+def run_prediction(cfg: DictConfig, scenario_id: str, dataset_dir: Path, prediction_dir: Path) -> None:
+    gold_document = Document.from_knp(Path(cfg.gold_knp_dir).joinpath(f"{scenario_id}.knp").read_text())
     scenario_id = gold_document.doc_id
     gold_annotation = ImageTextAnnotation.from_json(
         Path(cfg.gold_annotation_dir).joinpath(f"{scenario_id}.json").read_text()
@@ -43,10 +38,14 @@ def main(cfg: DictConfig) -> None:
 
     cohesion_analysis = CohesionAnalysis(cfg=cfg.cohesion, scenario_id=scenario_id)
 
-    # perform phrase grounding with MDETR
-    phrase_grounding = MDETRPhraseGrounding(
-        cfg=cfg.mdetr, scenario_id=scenario_id, document=gold_document, dataset_dir=dataset_dir
-    )
+    if cfg.phrase_grounding_model == "glip":
+        phrase_grounding = GLIPPhraseGrounding(
+            cfg=cfg.glip, scenario_id=scenario_id, document=gold_document, dataset_dir=dataset_dir
+        )
+    else:
+        phrase_grounding = MDETRPhraseGrounding(
+            cfg=cfg.mdetr, scenario_id=scenario_id, document=gold_document, dataset_dir=dataset_dir
+        )
     tasks = [cohesion_analysis, phrase_grounding]
 
     mot = MultipleObjectTracking(cfg=cfg.mot, scenario_id=scenario_id)
@@ -94,72 +93,6 @@ def main(cfg: DictConfig) -> None:
             phrase.relations.sort(key=lambda rel: rel.bounding_box.confidence, reverse=True)
     prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
-    )
-
-
-def run_glip(
-    cfg: DictConfig, dataset_info: DatasetInfo, dataset_dir: Path, document: Document
-) -> PhraseGroundingPrediction:
-    utterance_predictions: list[UtterancePrediction] = []
-    sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in document.sentences}
-    for idx, utterance in enumerate(dataset_info.utterances):
-        start_index = math.ceil(utterance.start / 1000)
-        if idx + 1 < len(dataset_info.utterances):
-            next_utterance = dataset_info.utterances[idx + 1]
-            end_index = math.ceil(next_utterance.start / 1000)
-        else:
-            end_index = len(dataset_info.images)
-        corresponding_images = dataset_info.images[start_index:end_index]
-        caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
-        phrases: list[PhrasePrediction] = [
-            PhrasePrediction(
-                sid=base_phrase.sentence.sid,
-                index=base_phrase.global_index,
-                text=base_phrase.text,
-                relations=[],
-            )
-            for base_phrase in caption.base_phrases
-        ]
-        with tempfile.TemporaryDirectory() as out_dir:
-            caption_file = Path(out_dir).joinpath("caption.knp")
-            caption_file.write_text(caption.to_knp())
-            subprocess.run(
-                [
-                    cfg.python,
-                    f"{cfg.project_root}/tools/run_glip.py",
-                    f"--model={cfg.checkpoint}",
-                    f"--config-file={cfg.config}",
-                    f"--caption-file={caption_file}",
-                    f"--export-dir={out_dir}",
-                    "--image-files",
-                ]
-                + [str(dataset_dir / image.path) for image in corresponding_images],
-                check=True,
-            )
-            predictions = [GLIPPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
-
-        assert len(corresponding_images) == len(predictions), f"{len(corresponding_images)} != {len(predictions)}"
-        for image, prediction in zip(corresponding_images, predictions):
-            for phrase, phrase_prediction in zip(phrases, prediction.phrases):
-                assert phrase_prediction.text == phrase.text
-                assert phrase_prediction.index == phrase.index
-                for bounding_box in phrase_prediction.bounding_boxes:
-                    assert bounding_box.image_id == image.id
-                    phrase.relations.append(
-                        RelationPrediction(
-                            type="=",
-                            image_id=image.id,
-                            bounding_box=BoundingBoxPrediction(
-                                image_id=image.id,
-                                rect=bounding_box.rect,
-                                confidence=bounding_box.confidence,
-                            ),
-                        )
-                    )
-        utterance_predictions.append(UtterancePrediction(text=caption.text, sids=utterance.sids, phrases=phrases))
-
-    return PhraseGroundingPrediction(
-        scenario_id=dataset_info.scenario_id, images=dataset_info.images, utterances=utterance_predictions
     )
 
 
