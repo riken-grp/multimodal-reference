@@ -167,9 +167,12 @@ result*
 *.png
 !tests/data/**/*.png
 outputs/*
-configs/*
+configs/*.yaml
 !configs/example.yaml
 !configs/base.yaml
+configs/cohesion/*.yaml
 !configs/cohesion/example.yaml
+!configs/grounding/*.yaml
 !configs/grounding/example.yaml
+!configs/mot/*.yaml
 !configs/mot/example.yaml

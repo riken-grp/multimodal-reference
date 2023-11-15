@@ -1,0 +1,5 @@
+python: /path/to/python
+project_root: /path/to/project
+checkpoint: /path/to/checkpoint
+gold_knp_dir: ./data/knp
+prediction_dir: ${prediction_dir}/cohesion
