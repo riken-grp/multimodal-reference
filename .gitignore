@@ -170,9 +170,8 @@ outputs/*
 configs/*.yaml
 !configs/example.yaml
 !configs/base.yaml
-configs/cohesion/*.yaml
+configs/*/*.yaml
 !configs/cohesion/example.yaml
-!configs/grounding/*.yaml
-!configs/grounding/example.yaml
-!configs/mot/*.yaml
+!configs/mdetr/example.yaml
+!configs/glip/example.yaml
 !configs/mot/example.yaml
