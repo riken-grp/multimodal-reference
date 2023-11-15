@@ -14,7 +14,7 @@ from rhoknp import BasePhrase, Document, Sentence
 from rhoknp.cohesion import EndophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
-from tasks import CohesionAnalysis, MDETRPhraseGrounding
+from tasks import CohesionAnalysis, MDETRPhraseGrounding, MultipleObjectTracking
 from utils.annotation import BoundingBox as BoundingBoxAnnotation
 from utils.annotation import ImageAnnotation, ImageTextAnnotation
 from utils.glip import GLIPPrediction
@@ -32,15 +32,14 @@ from utils.util import DatasetInfo, box_iou
 @hydra.main(version_base=None, config_path="../configs")
 def main(cfg: DictConfig) -> None:
     dataset_dir = Path(cfg.dataset_dir)
-    gold_knp_file = Path(cfg.gold_knp_file)
-    gold_annotation_file = Path(cfg.gold_annotation_file)
     prediction_dir = Path(cfg.prediction_dir)
     prediction_dir.mkdir(exist_ok=True)
 
-    dataset_info = DatasetInfo.from_json(dataset_dir.joinpath("info.json").read_text())
-    scenario_id = dataset_info.scenario_id
-    gold_document = Document.from_knp(gold_knp_file.read_text())
-    gold_annotation = ImageTextAnnotation.from_json(gold_annotation_file.read_text())
+    gold_document = Document.from_knp(Path(cfg.gold_knp_file).read_text())
+    scenario_id = gold_document.doc_id
+    gold_annotation = ImageTextAnnotation.from_json(
+        Path(cfg.gold_annotation_dir).joinpath(f"{scenario_id}.json").read_text()
+    )
 
     cohesion_analysis = CohesionAnalysis(cfg=cfg.cohesion, scenario_id=scenario_id)
 
@@ -48,8 +47,13 @@ def main(cfg: DictConfig) -> None:
     phrase_grounding = MDETRPhraseGrounding(
         cfg=cfg.mdetr, scenario_id=scenario_id, document=gold_document, dataset_dir=dataset_dir
     )
+    tasks = [cohesion_analysis, phrase_grounding]
 
-    luigi.build([cohesion_analysis, phrase_grounding], local_scheduler=True)
+    mot = MultipleObjectTracking(cfg=cfg.mot, scenario_id=scenario_id)
+    if cfg.mot_relax_mode == "pred":
+        tasks.append(mot)
+
+    luigi.build(tasks, local_scheduler=True)
 
     parsed_document = Document.from_knp(cohesion_analysis.output().open(mode="r").read())
     phrase_grounding_prediction = PhraseGroundingPrediction.from_json(phrase_grounding.output().open(mode="r").read())
@@ -62,14 +66,8 @@ def main(cfg: DictConfig) -> None:
     elif cfg.coref_relax_mode == "gold":
         relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
 
-    mot_file = prediction_dir / "mot" / f"{scenario_id}.json"
     if cfg.mot_relax_mode == "pred":
-        if not mot_file.exists():
-            mot_result = run_mot(cfg.mot, scenario_id)
-            mot_file.parent.mkdir(exist_ok=True)
-            mot_file.write_text(mot_result.to_json(ensure_ascii=False, indent=2))
-        else:
-            mot_result = DetectionLabels.from_json(mot_file.read_text())
+        mot_result = DetectionLabels.from_json(mot.output().open(mode="r").read())
         relax_prediction_with_mot(phrase_grounding_prediction, mot_result)
     elif cfg.mot_relax_mode == "gold":
         relax_prediction_with_mot(phrase_grounding_prediction, gold_annotation.images)
@@ -84,7 +82,7 @@ def main(cfg: DictConfig) -> None:
             elif cfg.coref_relax_mode == "gold":
                 relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
             if cfg.mot_relax_mode == "pred":
-                mot_result = DetectionLabels.from_json(mot_file.read_text())
+                mot_result = DetectionLabels.from_json(mot.output().open(mode="r").read())
                 relax_prediction_with_mot(phrase_grounding_prediction, mot_result)
             elif cfg.mot_relax_mode == "gold":
                 relax_prediction_with_mot(phrase_grounding_prediction, gold_annotation.images)
@@ -97,23 +95,6 @@ def main(cfg: DictConfig) -> None:
     prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
         mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
     )
-
-
-def run_mot(cfg: DictConfig, scenario_id: str) -> DetectionLabels:
-    with tempfile.TemporaryDirectory() as out_dir:
-        subprocess.run(
-            [
-                cfg.python,
-                f"{cfg.project_root}/src/mot_strong_sort.py",
-                f"{cfg.video_dir}/{scenario_id}/fp_video.mp4",
-                "--detic-dump",
-                f"{cfg.detic_dump_dir}/{scenario_id}.npy",
-                "--output-json",
-                f"{out_dir}/mot.json",
-            ],
-            check=True,
-        )
-        return DetectionLabels.from_json(Path(out_dir).joinpath("mot.json").read_text())
 
 
 def run_glip(
