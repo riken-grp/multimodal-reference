@@ -39,7 +39,7 @@ class MDETRPhraseGrounding(luigi.Task):
             document=self.document,
         )
         with self.output().open(mode="w") as f:
-            f.write(prediction.to_json())
+            f.write(prediction.to_json(ensure_ascii=False, indent=2))
 
 
 def run_mdetr(cfg: DictConfig, dataset_dir: Path, document: Document) -> PhraseGroundingPrediction:
