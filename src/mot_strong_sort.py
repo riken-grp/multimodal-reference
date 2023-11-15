@@ -83,7 +83,7 @@ def main():
                 BoundingBox(
                     rect=Rectangle(x1, y1, x2, y2),
                     confidence=confidence,
-                    class_id=class_id,
+                    class_name=class_names[class_id],
                     instance_id=instance_id,
                 )
             )
@@ -94,7 +94,7 @@ def main():
         if key == ord("q"):
             break
         tagged_images.append(frame)
-        frames.append(Frame(bounding_boxes))
+        frames.append(Frame(index=idx, bounding_boxes=bounding_boxes))
 
     if args.output_video is not None:
         fourcc: int = cv2.VideoWriter_fourcc(*"xvid")
@@ -105,7 +105,7 @@ def main():
             writer.write(img)
 
     if args.output_json is not None:
-        args.output_json.write_text(DetectionLabels(frames, class_names).to_json(indent=2))
+        args.output_json.write_text(DetectionLabels(frames=frames, class_names=class_names).to_json(indent=2))
 
 
 if __name__ == "__main__":

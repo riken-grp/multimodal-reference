@@ -17,6 +17,7 @@ class BoundingBox(CamelCaseDataClassJsonMixin):
 
 @dataclass(frozen=True)
 class MDETRPrediction(CamelCaseDataClassJsonMixin):
+    doc_id: str
     image_id: str
     bounding_boxes: list[BoundingBox]
     words: list[str]

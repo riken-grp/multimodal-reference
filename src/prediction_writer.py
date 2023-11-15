@@ -19,14 +19,14 @@ from utils.annotation import ImageAnnotation, ImageTextAnnotation
 from utils.glip import GLIPPrediction
 from utils.mdetr import MDETRPrediction
 from utils.mot import DetectionLabels
+from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import (
-    BoundingBox,
     PhraseGroundingPrediction,
     PhrasePrediction,
     RelationPrediction,
     UtterancePrediction,
 )
-from utils.util import DatasetInfo, Rectangle, box_iou
+from utils.util import DatasetInfo, box_iou
 
 
 @hydra.main(version_base=None, config_path="../configs")
@@ -186,7 +186,7 @@ def run_mdetr(
                         RelationPrediction(
                             type="=",
                             image_id=image.id,
-                            bounding_box=BoundingBox(
+                            bounding_box=BoundingBoxPrediction(
                                 image_id=image.id,
                                 rect=bounding_box.rect,
                                 confidence=bounding_box.confidence,
@@ -245,8 +245,8 @@ def run_glip(
 
         assert len(corresponding_images) == len(predictions), f"{len(corresponding_images)} != {len(predictions)}"
         for image, prediction in zip(corresponding_images, predictions):
-            for phrase, phrase_prediction in zip(phrases, prediction.phrase_predictions):
-                assert phrase_prediction.phrase == phrase.text
+            for phrase, phrase_prediction in zip(phrases, prediction.phrases):
+                assert phrase_prediction.text == phrase.text
                 assert phrase_prediction.phrase_index == phrase.index
                 for bounding_box in phrase_prediction.bounding_boxes:
                     assert bounding_box.image_id == image.id
@@ -254,7 +254,7 @@ def run_glip(
                         RelationPrediction(
                             type="=",
                             image_id=image.id,
-                            bounding_box=BoundingBox(
+                            bounding_box=BoundingBoxPrediction(
                                 image_id=image.id,
                                 rect=bounding_box.rect,
                                 confidence=bounding_box.confidence,
@@ -282,8 +282,8 @@ def relax_prediction_with_mot(
                 gold_bb_cluster[str(bb.instance_id)].append(
                     BoundingBoxAnnotation(
                         image_id=f"{idx:03d}",
-                        rect=Rectangle(x1=bb.x1, y1=bb.y1, x2=bb.x2, y2=bb.y2),
-                        class_name=str(bb.class_id),
+                        rect=bb.rect,
+                        class_name=bb.class_name,
                         instance_id=str(bb.instance_id),
                     )
                 )

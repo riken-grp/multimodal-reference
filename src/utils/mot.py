@@ -7,16 +7,17 @@ from utils.util import CamelCaseDataClassJsonMixin, Rectangle
 class BoundingBox(CamelCaseDataClassJsonMixin):
     rect: Rectangle
     confidence: float
-    class_id: int
+    class_name: str
     instance_id: int
 
 
 @dataclass(frozen=True)
 class Frame(CamelCaseDataClassJsonMixin):
+    index: int
     bounding_boxes: list[BoundingBox]
 
 
 @dataclass(frozen=True)
 class DetectionLabels(CamelCaseDataClassJsonMixin):
     frames: list[Frame]
-    classes: list[str]
+    class_names: list[str]
