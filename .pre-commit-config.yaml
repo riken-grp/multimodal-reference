@@ -22,5 +22,6 @@ repos:
         additional_dependencies:
           - rhoknp==1.6.0
           - cohesion-tools==0.5.7
+          - polars==0.18.15
           - dataclasses-json
           - omegaconf
