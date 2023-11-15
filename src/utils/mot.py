@@ -1,25 +1,14 @@
 from dataclasses import dataclass
 
-from utils.util import CamelCaseDataClassJsonMixin
+from utils.util import CamelCaseDataClassJsonMixin, Rectangle
 
 
 @dataclass(frozen=True)
 class BoundingBox(CamelCaseDataClassJsonMixin):
-    x1: int
-    y1: int
-    x2: int
-    y2: int
+    rect: Rectangle
     confidence: float
     class_id: int
     instance_id: int
-
-    @property
-    def w(self) -> int:
-        return self.x2 - self.x1
-
-    @property
-    def h(self) -> int:
-        return self.y2 - self.y1
 
 
 @dataclass(frozen=True)

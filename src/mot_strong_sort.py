@@ -9,6 +9,7 @@ import torch
 from boxmot import StrongSORT
 
 from utils.mot import BoundingBox, DetectionLabels, Frame
+from utils.util import Rectangle
 
 
 def parse_args():
@@ -78,7 +79,14 @@ def main():
                 thickness=5,
                 color=(255, 255, 255),
             )
-            bounding_boxes.append(BoundingBox(x1, y1, x2, y2, confidence, class_id, instance_id))
+            bounding_boxes.append(
+                BoundingBox(
+                    rect=Rectangle(x1, y1, x2, y2),
+                    confidence=confidence,
+                    class_id=class_id,
+                    instance_id=instance_id,
+                )
+            )
 
         if args.show:
             cv2.imshow("img", frame)
