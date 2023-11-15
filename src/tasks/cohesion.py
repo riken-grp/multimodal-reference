@@ -23,7 +23,7 @@ class CohesionAnalysis(luigi.Task):
 
     def run(self):
         document = run_cohesion(self.cfg, Path(self.cfg.gold_knp_dir) / f"{self.scenario_id}.knp")
-        with self.output().open(mode="wt") as f:
+        with self.output().open(mode="w") as f:
             f.write(document.to_knp())
 
 
