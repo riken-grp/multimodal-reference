@@ -22,6 +22,8 @@ from utils.util import box_iou
 
 @hydra.main(version_base=None, config_path="../configs")
 def main(cfg: DictConfig) -> None:
+    if len(cfg.scenario_ids) == 0 and cfg.id_file is not None:
+        cfg.scenario_ids = Path(cfg.id_file).read_text().strip().split()
     tasks: list[luigi.Task] = []
     for scenario_id in cfg.scenario_ids:
         tasks.append(MultimodalReference(cfg=cfg, scenario_id=scenario_id))

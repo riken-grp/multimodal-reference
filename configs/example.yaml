@@ -6,6 +6,9 @@ defaults:
   - mot: example.yaml
   - _self_
 
+scenario_ids: []
+id_file: null
+
 dataset_dir: /path/to/dataset
 gold_knp_dir: /path/to/gold/knp/file
 gold_annotation_dir: /path/to/gold/annotation
