@@ -25,3 +25,4 @@ repos:
           - polars==0.18.15
           - dataclasses-json
           - omegaconf
+          - luigi
