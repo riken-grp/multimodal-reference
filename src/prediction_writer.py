@@ -1,5 +1,6 @@
 import copy
 import math
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean
@@ -19,6 +20,12 @@ from utils.mot import DetectionLabels
 from utils.prediction import PhraseGroundingPrediction, RelationPrediction
 from utils.util import box_iou
 
+warnings.filterwarnings(
+    "ignore",
+    message=r'Parameter "(cfg|document)" with value .+ is not of type string\.',
+    category=UserWarning,
+)
+
 
 @hydra.main(version_base=None, config_path="../configs")
 def main(cfg: DictConfig) -> None:
@@ -27,7 +34,7 @@ def main(cfg: DictConfig) -> None:
     tasks: list[luigi.Task] = []
     for scenario_id in cfg.scenario_ids:
         tasks.append(MultimodalReference(cfg=cfg, scenario_id=scenario_id))
-    luigi.build(tasks, local_scheduler=True)
+    luigi.build(tasks, **cfg.luigi)
 
 
 class MultimodalReference(luigi.Task):

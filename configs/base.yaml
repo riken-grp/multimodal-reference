@@ -12,6 +12,11 @@ name: default
 exp_dir: ${work_dir}/result/mmref/${name}
 config_name: ${hydra:job.config_name}
 
+luigi:
+  local_scheduler: true
+  workers: 4
+  log_level: WARNING
+
 hydra:
   output_subdir: null
   # hydra_logging: null
