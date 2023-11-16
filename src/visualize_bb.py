@@ -6,6 +6,7 @@ from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.transforms import Bbox
 from PIL import Image, ImageFile
 from rhoknp import BasePhrase, Document, Sentence
 
@@ -63,13 +64,13 @@ def plot_results(
     topk: int = -1,
     confidence_threshold: float = 0.0,
 ) -> None:
-    plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=(16, 10))
     np_image = np.array(image)
-    ax = plt.gca()
+    ax = fig.add_subplot(111)
 
     if "pred" in plots:
         draw_prediction(
-            ax, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk, relation_types
+            ax, fig, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk, relation_types
         )
 
     if "gold" in plots:
@@ -86,8 +87,9 @@ def plot_results(
 
     plt.imshow(np_image)
     plt.axis("off")
-    plt.savefig(str(export_dir / f"{image_annotation.image_id}.png"))
+    fig.savefig(str(export_dir / f"{image_annotation.image_id}.png"))
     # plt.show()
+    plt.close(fig)
 
 
 def draw_annotation(
@@ -123,6 +125,7 @@ def draw_annotation(
 
 def draw_prediction(
     ax: plt.Axes,
+    fig,
     base_phrases: list[BasePhrase],
     confidence_threshold: float,
     image_annotation: ImageAnnotation,
@@ -131,6 +134,7 @@ def draw_prediction(
     relation_types: set[str],
 ) -> None:
     colors = COLORS * 100
+    drawn_bbs: set[Bbox] = set()
     for phrase_prediction in phrase_predictions:
         target_relation_types: set[str] = {relation.type for relation in phrase_prediction.relations} & relation_types
         for relation_type in target_relation_types:
@@ -146,14 +150,14 @@ def draw_prediction(
                 pred_bounding_box = pred_relation.bounding_box
                 rect = pred_bounding_box.rect
                 base_phrase = next(filter(lambda bp: bp.text == phrase_prediction.text, base_phrases))
-                label = "{type}_{text}: {score:0.2f}".format(
+                label = "{type}_{text}: {score:0.3f}".format(
                     type=pred_relation.type,
                     text=get_core_expression(base_phrase)[1],
                     score=pred_bounding_box.confidence,
                 )
                 color = colors.pop()
                 ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=color, linewidth=3))
-                ax.text(
+                text_box = ax.text(
                     rect.x1,
                     rect.y1,
                     label,
@@ -161,6 +165,18 @@ def draw_prediction(
                     bbox=dict(facecolor=color, alpha=0.8),
                     fontname="Hiragino Maru Gothic Pro",
                 )
+                fig.canvas.draw()
+                bbox_window = text_box.get_window_extent()
+                bbox = bbox_window.transformed(ax.transData.inverted())
+                bbox = Bbox.from_bounds(bbox.x0, bbox.y0, bbox_window.width, bbox_window.height)
+
+                count = 0
+                stride = 10
+                while any(Bbox.intersection(bb, bbox) is not None for bb in drawn_bbs) and count < 50:
+                    text_box.set_y(text_box.get_position()[1] - stride)
+                    bbox = Bbox.from_bounds(bbox.x0, bbox.y0 - stride, bbox.width, bbox.height)
+                    count += 1
+                drawn_bbs.add(bbox)
 
 
 def parse_args():
@@ -266,7 +282,7 @@ def visualize(
                 utterance_prediction.phrases if utterance_prediction else [],
                 base_phrases,
                 export_dir,
-                confidence_threshold=0.9,
+                confidence_threshold=0.8,
                 plots=plots,
                 relation_types=set(relation_types),
             )
