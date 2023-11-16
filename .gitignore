@@ -175,3 +175,4 @@ configs/*/*.yaml
 !configs/mdetr/example.yaml
 !configs/glip/example.yaml
 !configs/mot/example.yaml
+model/*
