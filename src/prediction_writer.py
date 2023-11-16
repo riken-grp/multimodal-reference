@@ -31,7 +31,7 @@ def main(cfg: DictConfig) -> None:
 
 
 class MultimodalReference(luigi.Task):
-    cfg: Annotated[DictConfig, luigi.DictParameter()] = luigi.DictParameter()
+    cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
 
     def __init__(self, *args, **kwargs) -> None:

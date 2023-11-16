@@ -21,7 +21,7 @@ from utils.util import DatasetInfo
 
 class GLIPPhraseGrounding(luigi.Task):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
-    cfg: Annotated[DictConfig, luigi.DictParameter()] = luigi.DictParameter()
+    cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
     document: Annotated[Document, luigi.Parameter()] = luigi.Parameter()
     dataset_dir: Annotated[Path, luigi.PathParameter()] = luigi.PathParameter()
 
