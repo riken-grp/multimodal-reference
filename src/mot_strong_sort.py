@@ -36,7 +36,7 @@ def main():
 
     # Tracker
     mot_tracker = StrongSORT(
-        model_weights=Path("osnet_ain_x1_0_msmt17.pt"),
+        model_weights=Path("model/osnet_ain_x1_0_msmt17.pt"),
         device="cuda" if torch.cuda.is_available() else "cpu",
         fp16=False,
     )

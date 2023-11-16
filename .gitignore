@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 
 data
+model
 !tests/data
 result*
 /*.json
@@ -175,4 +176,3 @@ configs/*/*.yaml
 !configs/mdetr/example.yaml
 !configs/glip/example.yaml
 !configs/mot/example.yaml
-model/*
