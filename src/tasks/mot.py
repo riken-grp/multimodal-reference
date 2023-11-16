@@ -11,7 +11,7 @@ from utils.mot import DetectionLabels
 
 class MultipleObjectTracking(luigi.Task):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
-    cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
+    cfg: Annotated[DictConfig, luigi.DictParameter()] = luigi.DictParameter()
 
     def requires(self):
         pass

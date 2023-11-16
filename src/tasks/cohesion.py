@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 
 class CohesionAnalysis(luigi.Task):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
-    cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
+    cfg: Annotated[DictConfig, luigi.DictParameter()] = luigi.DictParameter()
 
     def requires(self):
         pass
