@@ -3,7 +3,7 @@ import math
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean
-from typing import Union
+from typing import Annotated, Optional, Union
 
 import hydra
 import luigi
@@ -22,43 +22,83 @@ from utils.util import box_iou
 
 @hydra.main(version_base=None, config_path="../configs")
 def main(cfg: DictConfig) -> None:
-    dataset_dir = Path(cfg.dataset_dir)
-    exp_dir = Path(cfg.exp_dir)
-    exp_dir.mkdir(exist_ok=True)
+    tasks: list[luigi.Task] = []
     for scenario_id in cfg.scenario_ids:
-        run_prediction(cfg, scenario_id, dataset_dir=dataset_dir / scenario_id, prediction_dir=exp_dir)
-
-
-def run_prediction(cfg: DictConfig, scenario_id: str, dataset_dir: Path, prediction_dir: Path) -> None:
-    gold_document = Document.from_knp(Path(cfg.gold_knp_dir).joinpath(f"{scenario_id}.knp").read_text())
-    scenario_id = gold_document.doc_id
-    gold_annotation = ImageTextAnnotation.from_json(
-        Path(cfg.gold_annotation_dir).joinpath(f"{scenario_id}.json").read_text()
-    )
-
-    cohesion_analysis = CohesionAnalysis(cfg=cfg.cohesion, scenario_id=scenario_id)
-
-    if cfg.phrase_grounding_model == "glip":
-        phrase_grounding = GLIPPhraseGrounding(
-            cfg=cfg.glip, scenario_id=scenario_id, document=gold_document, dataset_dir=dataset_dir
-        )
-    else:
-        phrase_grounding = MDETRPhraseGrounding(
-            cfg=cfg.mdetr, scenario_id=scenario_id, document=gold_document, dataset_dir=dataset_dir
-        )
-    tasks = [cohesion_analysis, phrase_grounding]
-
-    mot = MultipleObjectTracking(cfg=cfg.mot, scenario_id=scenario_id)
-    if cfg.mot_relax_mode == "pred":
-        tasks.append(mot)
-
+        tasks.append(MultimodalReference(cfg=cfg, scenario_id=scenario_id))
     luigi.build(tasks, local_scheduler=True)
 
-    parsed_document = Document.from_knp(cohesion_analysis.output().open(mode="r").read())
-    phrase_grounding_prediction = PhraseGroundingPrediction.from_json(phrase_grounding.output().open(mode="r").read())
 
-    parsed_document = preprocess_document(parsed_document)
-    mm_reference_prediction = relax_prediction_with_pas_bridging(phrase_grounding_prediction, parsed_document)
+class MultimodalReference(luigi.Task):
+    cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
+    scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.dataset_dir = Path(self.cfg.dataset_dir) / self.scenario_id
+        self.exp_dir = Path(self.cfg.exp_dir)
+        self.gold_document = Document.from_knp(
+            Path(self.cfg.gold_knp_dir).joinpath(f"{self.scenario_id}.knp").read_text()
+        )
+
+    def requires(self) -> dict[str, luigi.Task]:
+        tasks: dict[str, luigi.Task] = {
+            "cohesion": CohesionAnalysis(cfg=self.cfg.cohesion, scenario_id=self.scenario_id)
+        }
+        if self.cfg.phrase_grounding_model == "glip":
+            tasks["grounding"] = GLIPPhraseGrounding(
+                cfg=self.cfg.glip,
+                scenario_id=self.scenario_id,
+                document=self.gold_document,
+                dataset_dir=self.dataset_dir,
+            )
+        else:
+            assert self.cfg.phrase_grounding_model == "mdetr"
+            tasks["grounding"] = MDETRPhraseGrounding(
+                cfg=self.cfg.mdetr,
+                scenario_id=self.scenario_id,
+                document=self.gold_document,
+                dataset_dir=self.dataset_dir,
+            )
+        if self.cfg.mot_relax_mode == "pred":
+            tasks["mot"] = MultipleObjectTracking(cfg=self.cfg.mot, scenario_id=self.scenario_id)
+        return tasks
+
+    def output(self):
+        return luigi.LocalTarget(self.exp_dir.joinpath(f"{self.scenario_id}.json"))
+
+    def run(self):
+        with self.input()["cohesion"].open(mode="r") as f:
+            cohesion_prediction = Document.from_knp(f.read())
+        with self.input()["grounding"].open(mode="r") as f:
+            phrase_grounding_prediction = PhraseGroundingPrediction.from_json(f.read())
+        mot_prediction: Optional[DetectionLabels] = None
+        if self.cfg.mot_relax_mode == "pred":
+            with self.input()["mot"].open(mode="r") as f:
+                mot_prediction = DetectionLabels.from_json(f.read())
+        gold_annotation = ImageTextAnnotation.from_json(
+            Path(self.cfg.gold_annotation_dir).joinpath(f"{self.scenario_id}.json").read_text()
+        )
+        prediction = run_prediction(
+            cfg=self.cfg,
+            cohesion_prediction=cohesion_prediction,
+            phrase_grounding_prediction=phrase_grounding_prediction,
+            mot_prediction=mot_prediction,
+            gold_document=self.gold_document,
+            image_annotations=gold_annotation.images,
+        )
+        with self.output().open(mode="w") as f:
+            f.write(prediction.to_json(ensure_ascii=False, indent=2))
+
+
+def run_prediction(
+    cfg: DictConfig,
+    cohesion_prediction: Document,
+    phrase_grounding_prediction: PhraseGroundingPrediction,
+    mot_prediction: Optional[DetectionLabels],
+    gold_document: Document,
+    image_annotations: list[ImageAnnotation],
+) -> PhraseGroundingPrediction:
+    parsed_document = preprocess_document(cohesion_prediction)
 
     if cfg.coref_relax_mode == "pred":
         relax_prediction_with_coreference(phrase_grounding_prediction, parsed_document)
@@ -66,10 +106,10 @@ def run_prediction(cfg: DictConfig, scenario_id: str, dataset_dir: Path, predict
         relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
 
     if cfg.mot_relax_mode == "pred":
-        mot_result = DetectionLabels.from_json(mot.output().open(mode="r").read())
-        relax_prediction_with_mot(phrase_grounding_prediction, mot_result)
+        assert mot_prediction is not None
+        relax_prediction_with_mot(phrase_grounding_prediction, mot_prediction)
     elif cfg.mot_relax_mode == "gold":
-        relax_prediction_with_mot(phrase_grounding_prediction, gold_annotation.images)
+        relax_prediction_with_mot(phrase_grounding_prediction, image_annotations)
 
     if cfg.coref_relax_mode is not None and cfg.mot_relax_mode is not None:
         # prev_phrase_grounding_prediction = None
@@ -81,19 +121,19 @@ def run_prediction(cfg: DictConfig, scenario_id: str, dataset_dir: Path, predict
             elif cfg.coref_relax_mode == "gold":
                 relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
             if cfg.mot_relax_mode == "pred":
-                mot_result = DetectionLabels.from_json(mot.output().open(mode="r").read())
-                relax_prediction_with_mot(phrase_grounding_prediction, mot_result)
+                assert mot_prediction is not None
+                relax_prediction_with_mot(phrase_grounding_prediction, mot_prediction)
             elif cfg.mot_relax_mode == "gold":
-                relax_prediction_with_mot(phrase_grounding_prediction, gold_annotation.images)
+                relax_prediction_with_mot(phrase_grounding_prediction, image_annotations)
             count += 1
+
+    mm_reference_prediction = relax_prediction_with_pas_bridging(phrase_grounding_prediction, parsed_document)
 
     # sort relations by confidence
     for utterance in mm_reference_prediction.utterances:
         for phrase in utterance.phrases:
             phrase.relations.sort(key=lambda rel: rel.bounding_box.confidence, reverse=True)
-    prediction_dir.joinpath(f"{parsed_document.did}.json").write_text(
-        mm_reference_prediction.to_json(ensure_ascii=False, indent=2)
-    )
+    return mm_reference_prediction
 
 
 def relax_prediction_with_mot(
