@@ -1175,6 +1175,7 @@ files = [
 python-daemon = "*"
 python-dateutil = ">=2.7.5,<3"
 tenacity = ">=8,<9"
+toml = {version = "<2.0.0", optional = true, markers = "extra == \"toml\""}
 tornado = ">=5.0,<7"
 
 [package.extras]
@@ -2412,6 +2413,17 @@ files = [
 ]
 
 [[package]]
+name = "toml"
+version = "0.10.2"
+description = "Python Library for Tom's Obvious, Minimal Language"
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
+files = [
+    {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
+    {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
+]
+
+[[package]]
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
@@ -2703,4 +2715,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "a8e1e3259ff5004732437bd197478871eece291d96784e5c1b1d6dc9c46abd9f"
+content-hash = "14eaab4acdbd3fd4ed3a4d161908c90976d4419b1f81cd5586f651116f1e6dd2"
