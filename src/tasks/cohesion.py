@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -34,4 +35,4 @@ class CohesionAnalysis(luigi.Task):
                 check=True,
             )
             output_knp_file = next(Path(out_dir).glob("*.knp"))
-            output_knp_file.rename(self.output().path)
+            shutil.copy(output_knp_file, self.output().path)
