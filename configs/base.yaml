@@ -27,6 +27,7 @@ hydra:
     dir: ${work_dir}/multirun_result
     subdir: ${name}-${hydra:job.num}
   job:
+    chdir: false
     config:
       override_dirname:
         kv_sep: '_'
