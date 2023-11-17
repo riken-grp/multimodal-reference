@@ -207,14 +207,15 @@ def parse_args():
     )
     parser.add_argument("--gold-knp-dir", "-k", type=Path, default="data/knp", help="Path to the gold KNP directory.")
     parser.add_argument(
-        "--gold-image-dir",
-        "-i",
+        "--gold-annotation-dir",
+        "-a",
         type=Path,
         default="data/image_text_annotation",
         help="Path to the gold image text annotation file.",
     )
     parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction directory.")
-    parser.add_argument("--scenario-ids", type=str, nargs="*", help="List of scenario ids.")
+    parser.add_argument("--prediction-knp-dir", type=Path, help="Path to the prediction directory.")
+    parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
     parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
     parser.add_argument(
         "--eval-modes", type=str, default="rel", nargs="*", choices=["rel", "class", "text"], help="evaluation modes"
@@ -233,9 +234,9 @@ def main():
     for scenario_id in args.scenario_ids:
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())
         gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
-        pred_document = Document.from_knp(args.prediction_dir.joinpath(f"{scenario_id}.knp").read_text())
+        pred_document = Document.from_knp(args.prediction_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
         image_text_annotation = ImageTextAnnotation.from_json(
-            args.gold_image_dir.joinpath(f"{scenario_id}.json").read_text()
+            args.gold_annotation_dir.joinpath(f"{scenario_id}.json").read_text()
         )
         prediction = PhraseGroundingPrediction.from_json(
             args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
