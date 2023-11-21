@@ -23,12 +23,25 @@ hydra:
   # job_logging: null
   run:
     dir: ${exp_dir}
-  sweep:
-    dir: ${work_dir}/multirun_result
-    subdir: ${name}-${hydra:job.num}
+  # sweep:
+  #   dir: ${work_dir}/multirun_result
+  #   subdir: ${name}-${hydra:job.num}
   job:
     chdir: false
     config:
       override_dirname:
         kv_sep: '_'
         item_sep: '-'
+        exclude_keys:
+          - work_dir
+          - name
+          - exp_dir
+          - luigi.local_scheduler
+          - luigi.workers
+          - luigi.log_level
+          - scenario_ids
+          - id_file
+          - phrase_grounding_model
+          - coref_relax_mode
+          - mot_relax_mode
+          - names
