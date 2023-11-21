@@ -26,3 +26,4 @@ repos:
           - dataclasses-json
           - omegaconf
           - luigi
+          - types-tabulate
