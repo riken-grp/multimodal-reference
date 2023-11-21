@@ -26,8 +26,9 @@ class MDETRPhraseGrounding(luigi.Task):
     document: Annotated[Document, luigi.Parameter()] = luigi.Parameter()
     dataset_dir: Annotated[Path, luigi.PathParameter()] = luigi.PathParameter()
 
-    def requires(self):
-        pass
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def output(self):
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
