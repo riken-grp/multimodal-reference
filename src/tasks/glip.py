@@ -1,5 +1,6 @@
 import math
 import os
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
@@ -30,7 +31,9 @@ class GLIPPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         available_gpus = [int(gpu_id) for gpu_id in os.environ.get("AVAILABLE_GPUS", "0").split(",")]
-        super(luigi.Task, self).__init__(available_gpus, state_file_path=Path("shared_state.json"))
+        super(luigi.Task, self).__init__(
+            available_gpus, Path("shared_state.json"), state_prefix=f"{socket.gethostname()}_gpu"
+        )
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def output(self):
