@@ -28,7 +28,6 @@ class MMRefEvaluator:
         self.image_id_to_annotation: dict[str, ImageAnnotation] = {
             image.image_id: image for image in image_text_annotation.images
         }
-        self.confidence_threshold = 0.9
         self.iou_threshold = 0.5
 
     def eval_textual_reference(self, pred_document: Document) -> CohesionScore:
@@ -44,9 +43,64 @@ class MMRefEvaluator:
         )
         return scorer.run()
 
-    def eval_visual_reference(self, prediction: PhraseGroundingPrediction, topk: int = -1) -> list:
-        recall_tracker = RatioTracker()
-        precision_tracker = RatioTracker()
+    def eval_visual_reference(
+        self, prediction: PhraseGroundingPrediction, recall_topk: int = -1, confidence_threshold: float = 0.0
+    ) -> list[dict[str, Any]]:
+        recall_rects, precision_rects = self._compare_prediction_and_annotation(prediction)
+
+        result_dict: dict[tuple[str, str, int, str, str, str], dict[str, Any]] = defaultdict(dict)
+
+        for key, orig_rects in recall_rects.items():
+            recall_pos = 0
+            recall_total = 0
+            rects: list[tuple[float, bool]] = sorted(orig_rects, key=lambda x: x[0], reverse=True)
+            if recall_topk >= 0:
+                rects = rects[:recall_topk]
+            if confidence_threshold >= 0:
+                rects = [rect for rect in rects if rect[0] >= confidence_threshold]
+            if any(rect[1] for rect in rects):
+                recall_pos += 1
+            recall_total += 1
+            result_dict[key]["recall_pos"] = recall_pos
+            result_dict[key]["recall_total"] = recall_total
+
+        for key, rects in precision_rects.items():
+            confidence: float = next(iter(rects))[0]
+            if confidence < confidence_threshold:
+                continue
+            precision_pos = 0
+            precision_total = 0
+            # old way of calculating precision
+            # precision_pos += sum(rect[1] for rect in rects)
+            # precision_total += max(1, sum(rect[1] for rect in rects))
+            if any(rect[1] for rect in rects):
+                precision_pos += 1
+            precision_total += 1
+            result_dict[key]["precision_pos"] = precision_pos
+            result_dict[key]["precision_total"] = precision_total
+
+        results: list[dict[str, Any]] = []
+        for key, metrics in result_dict.items():
+            results.append(
+                {
+                    "image_id": key[0],
+                    "sid": key[1],
+                    "base_phrase_index": key[2],
+                    "relation_type": key[3],
+                    "instance_id_or_pred_idx": key[4],
+                    "class_name": key[5],
+                    "recall_pos": metrics.get("recall_pos", 0),
+                    "recall_total": metrics.get("recall_total", 0),
+                    "precision_pos": metrics.get("precision_pos", 0),
+                    "precision_total": metrics.get("precision_total", 0),
+                }
+            )
+        return results
+
+    def _compare_prediction_and_annotation(self, prediction: PhraseGroundingPrediction) -> tuple[dict, dict]:
+        recall_rects: dict[tuple, list[tuple[float, bool]]] = {}
+        precision_rects: dict[tuple, list[tuple[float, bool]]] = {}
+
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
         assert len(self.dataset_info.utterances) == len(self.utterance_annotations) == len(prediction.utterances)
@@ -97,20 +151,12 @@ class MMRefEvaluator:
                         key=lambda bb: bb.confidence,
                         reverse=True,
                     )
-                    if len(pred_bounding_boxes) > 0:
-                        gold_box: Rectangle = gold_bounding_box.rect
-                        if topk == -1:
-                            pred_boxes = [
-                                bb.rect for bb in pred_bounding_boxes if bb.confidence >= self.confidence_threshold
-                            ]
-                        else:
-                            pred_boxes = [bb.rect for bb in pred_bounding_boxes[:topk]]
-                        if any(box_iou(gold_box, pred_box) >= self.iou_threshold for pred_box in pred_boxes):
-                            recall_tracker.add_positive(key)
-                        else:
-                            recall_tracker.add_negative(key)
-                    else:
-                        recall_tracker.add_negative(key)
+                    gold_box: Rectangle = gold_bounding_box.rect
+                    rects: list[tuple] = []
+                    for pred_bounding_box in pred_bounding_boxes:
+                        is_tp = box_iou(gold_box, pred_bounding_box.rect) >= self.iou_threshold
+                        rects.append((pred_bounding_box.confidence, is_tp))
+                    recall_rects[key] = rects
 
                 # precision
                 for rel_idx, pred_relation in enumerate(pred_relations):
@@ -119,8 +165,6 @@ class MMRefEvaluator:
                     gold_relations = [
                         rel for rel in phrase_annotation.relations if rel.type in (relation_type, relation_type + "≒")
                     ]
-                    if pred_relation.bounding_box.confidence < self.confidence_threshold:
-                        continue
                     pred_box: Rectangle = pred_relation.bounding_box.rect
                     gold_bounding_boxes = [
                         instance_id_to_bounding_box[rel.instance_id]
@@ -130,70 +174,24 @@ class MMRefEvaluator:
                             and instance_id_to_bounding_box[rel.instance_id].class_name != "region"
                         )
                     ]
-                    tp_gold_bounding_boxes = [
-                        bb for bb in gold_bounding_boxes if box_iou(bb.rect, pred_box) >= self.iou_threshold
-                    ]
-                    for tp_gold_bounding_box in tp_gold_bounding_boxes:
-                        key = (
-                            image_id,
-                            sid,
-                            base_phrase.index,
-                            relation_type,
-                            tp_gold_bounding_box.instance_id,
-                            tp_gold_bounding_box.class_name,
-                        )
-                        precision_tracker.add_positive(key)
-                    if len(tp_gold_bounding_boxes) == 0:
-                        key = (image_id, sid, base_phrase.index, relation_type, f"fp_{rel_idx}", "false_positive")
-                        precision_tracker.add_negative(key)
+                    key = (
+                        image_id,
+                        sid,
+                        base_phrase.index,
+                        relation_type,
+                        str(rel_idx),
+                        "",
+                    )
+                    rects = []
+                    for gold_bounding_box in gold_bounding_boxes:
+                        is_tp = box_iou(gold_bounding_box.rect, pred_box) >= self.iou_threshold
+                        rects.append((pred_relation.bounding_box.confidence, is_tp))
+                    if not rects:
+                        # ensure at least one rect to store confidence
+                        rects.append((pred_relation.bounding_box.confidence, False))
+                    precision_rects[key] = rects
 
-        result_dict: dict[tuple[str, str, int, str, str, str], dict[str, Any]] = {}
-        result_dict.update({key: {"recall_pos": value} for key, value in recall_tracker.positive.items()})
-        for key, value in recall_tracker.total.items():
-            if key in result_dict:
-                result_dict[key]["recall_total"] = value
-            else:
-                result_dict[key] = {"recall_total": value}
-        for key, value in precision_tracker.positive.items():
-            if key in result_dict:
-                result_dict[key]["precision_pos"] = value
-            else:
-                result_dict[key] = {"precision_pos": value}
-        for key, value in precision_tracker.total.items():
-            if key in result_dict:
-                result_dict[key]["precision_total"] = value
-            else:
-                result_dict[key] = {"precision_total": value}
-        results: list[dict[str, Any]] = []
-        for key, metrics in result_dict.items():
-            results.append(
-                {
-                    "image_id": key[0],
-                    "sid": key[1],
-                    "base_phrase_index": key[2],
-                    "relation_type": key[3],
-                    "instance_id": key[4],
-                    "class_name": key[5],
-                    "recall_pos": metrics.get("recall_pos", 0),
-                    "recall_total": metrics.get("recall_total", 0),
-                    "precision_pos": metrics.get("precision_pos", 0),
-                    "precision_total": metrics.get("precision_total", 0),
-                }
-            )
-        return results
-
-
-class RatioTracker:
-    def __init__(self):
-        self.total: dict[Any, int] = defaultdict(int)
-        self.positive: dict[Any, int] = defaultdict(int)
-
-    def add_positive(self, category: Any):
-        self.total[category] += 1
-        self.positive[category] += 1
-
-    def add_negative(self, category: Any):
-        self.total[category] += 1
+        return recall_rects, precision_rects
 
 
 def parse_args():
@@ -214,7 +212,9 @@ def parse_args():
         help="Path to the gold image text annotation file.",
     )
     parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction directory.")
-    parser.add_argument("--prediction-knp-dir", type=Path, help="Path to the prediction directory.")
+    parser.add_argument(
+        "--prediction-knp-dir", type=Path, default="result/cohesion", help="Path to the prediction directory."
+    )
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
     parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
     parser.add_argument(
@@ -248,7 +248,7 @@ def main():
             image_text_annotation,
         )
         textual_results.append(evaluator.eval_textual_reference(pred_document))
-        for row in evaluator.eval_visual_reference(prediction, topk=args.recall_topk):
+        for row in evaluator.eval_visual_reference(prediction, recall_topk=args.recall_topk, confidence_threshold=0.9):
             result = {"scenario_id": scenario_id}
             result.update(row)
             results.append(result)
@@ -261,7 +261,7 @@ def main():
         df_rel = (
             result_df.groupby("relation_type", maintain_order=True)
             .sum()
-            .drop(["image_id", "sid", "base_phrase_index", "instance_id", "class_name"])
+            .drop(["image_id", "sid", "base_phrase_index", "instance_id_or_pred_idx", "class_name"])
         )
         df_rel = df_rel.with_columns(
             [
@@ -284,7 +284,7 @@ def main():
             result_df.filter(pl.col("relation_type") == "=")
             .groupby("class_name", maintain_order=True)
             .sum()
-            .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id"])
+            .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id_or_pred_idx"])
         )
         df_class = df_class.with_columns(
             [
