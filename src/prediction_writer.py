@@ -13,7 +13,13 @@ from rhoknp import BasePhrase, Document, Sentence
 from rhoknp.cohesion import EndophoraArgument, RelMode, RelTagList
 from rhoknp.cohesion.coreference import EntityManager
 
-from tasks import CohesionAnalysis, GLIPPhraseGrounding, MDETRPhraseGrounding, MultipleObjectTracking
+from tasks import (
+    CohesionAnalysis,
+    DeticPhraseGrounding,
+    GLIPPhraseGrounding,
+    MDETRPhraseGrounding,
+    MultipleObjectTracking,
+)
 from utils.annotation import BoundingBox as BoundingBoxAnnotation
 from utils.annotation import ImageAnnotation, ImageTextAnnotation
 from utils.mot import DetectionLabels
@@ -60,9 +66,16 @@ class MultimodalReference(luigi.Task):
                 document=self.gold_document,
                 dataset_dir=self.dataset_dir,
             )
-        else:
-            assert self.cfg.phrase_grounding_model == "mdetr"
+        elif self.cfg.phrase_grounding_model == "mdetr":
             tasks["grounding"] = MDETRPhraseGrounding(
+                cfg=self.cfg.mdetr,
+                scenario_id=self.scenario_id,
+                document=self.gold_document,
+                dataset_dir=self.dataset_dir,
+            )
+        else:
+            assert self.cfg.phrase_grounding_model == "detic"
+            tasks["grounding"] = DeticPhraseGrounding(
                 cfg=self.cfg.mdetr,
                 scenario_id=self.scenario_id,
                 document=self.gold_document,
