@@ -1,4 +1,6 @@
 import math
+import os
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
@@ -8,6 +10,7 @@ import luigi
 from omegaconf import DictConfig
 from rhoknp import Document, Sentence
 
+from tasks.util import FileBasedResourceManagerMixin
 from utils.glip import GLIPPrediction
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import (
@@ -19,7 +22,7 @@ from utils.prediction import (
 from utils.util import DatasetInfo
 
 
-class GLIPPhraseGrounding(luigi.Task):
+class GLIPPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
     cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
     document: Annotated[Document, luigi.Parameter()] = luigi.Parameter()
@@ -27,22 +30,35 @@ class GLIPPhraseGrounding(luigi.Task):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        available_gpus = [int(gpu_id) for gpu_id in os.environ.get("AVAILABLE_GPUS", "0").split(",")]
+        super(luigi.Task, self).__init__(
+            available_gpus, Path("shared_state.json"), state_prefix=f"{socket.gethostname()}_gpu"
+        )
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def output(self):
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
 
     def run(self):
-        prediction = run_glip(
-            self.cfg,
-            dataset_dir=self.dataset_dir,
-            document=self.document,
-        )
-        with self.output().open(mode="w") as f:
-            f.write(prediction.to_json(ensure_ascii=False, indent=2))
+        gpu_id = self.acquire_resource()
+        if gpu_id is None:
+            raise RuntimeError("No available GPU.")
+        try:
+            env = os.environ.copy()
+            env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+            prediction = run_glip(
+                self.cfg,
+                dataset_dir=self.dataset_dir,
+                document=self.document,
+                env=env,
+            )
+            with self.output().open(mode="w") as f:
+                f.write(prediction.to_json(ensure_ascii=False, indent=2))
+        finally:
+            self.release_resource(gpu_id)
 
 
-def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document) -> PhraseGroundingPrediction:
+def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[str, str]) -> PhraseGroundingPrediction:
     dataset_info = DatasetInfo.from_json(dataset_dir.joinpath("info.json").read_text())
     utterance_predictions: list[UtterancePrediction] = []
     sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in document.sentences}
@@ -79,6 +95,7 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document) -> PhraseGr
                 ]
                 + [str(dataset_dir / image.path) for image in corresponding_images],
                 check=True,
+                env=env,
             )
             predictions = [GLIPPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
 
