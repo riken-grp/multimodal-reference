@@ -218,6 +218,13 @@ def parse_args():
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
     parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
     parser.add_argument(
+        "--confidence-threshold",
+        "--th",
+        type=float,
+        default=0.0,
+        help="Confidence threshold for predicted bounding boxes.",
+    )
+    parser.add_argument(
         "--eval-modes", type=str, default="rel", nargs="*", choices=["rel", "class", "text"], help="evaluation modes"
     )
     parser.add_argument(
@@ -248,7 +255,9 @@ def main():
             image_text_annotation,
         )
         textual_results.append(evaluator.eval_textual_reference(pred_document))
-        for row in evaluator.eval_visual_reference(prediction, recall_topk=args.recall_topk, confidence_threshold=0.9):
+        for row in evaluator.eval_visual_reference(
+            prediction, recall_topk=args.recall_topk, confidence_threshold=args.confidence_threshold
+        ):
             result = {"scenario_id": scenario_id}
             result.update(row)
             results.append(result)
