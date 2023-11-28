@@ -91,7 +91,7 @@ def test_evaluate(fixture_data_dir: Path):
         evaluate_dir.joinpath(f"{image_text_annotation.scenario_id}.json").read_text()
     )
 
-    results: list[dict[str, Any]] = evaluator.eval_visual_reference(prediction)
+    results: list[dict[str, Any]] = evaluator.eval_visual_reference(prediction, recall_top_ks=[-1])
     result_df = pl.DataFrame(results)
     df_rel = result_df.groupby("relation_type", maintain_order=True).sum()
     result = {}

@@ -44,40 +44,31 @@ class MMRefEvaluator:
         return scorer.run()
 
     def eval_visual_reference(
-        self, prediction: PhraseGroundingPrediction, recall_topk: int = -1, confidence_threshold: float = 0.0
+        self, prediction: PhraseGroundingPrediction, recall_top_ks: list[int], confidence_threshold: float = 0.0
     ) -> list[dict[str, Any]]:
         recall_rects, precision_rects = self._compare_prediction_and_annotation(prediction)
 
         result_dict: dict[tuple[str, str, int, str, str, str], dict[str, Any]] = defaultdict(dict)
 
         for key, orig_rects in recall_rects.items():
-            recall_pos = 0
-            recall_total = 0
             rects: list[tuple[float, bool]] = sorted(orig_rects, key=lambda x: x[0], reverse=True)
-            if recall_topk >= 0:
-                rects = rects[:recall_topk]
             if confidence_threshold >= 0:
                 rects = [rect for rect in rects if rect[0] >= confidence_threshold]
-            if any(rect[1] for rect in rects):
-                recall_pos += 1
-            recall_total += 1
-            result_dict[key]["recall_pos"] = recall_pos
-            result_dict[key]["recall_total"] = recall_total
+            for recall_topk in recall_top_ks:
+                topk_rects = rects[:recall_topk] if recall_topk >= 0 else rects
+                recall_pos = int(any(rect[1] for rect in topk_rects))  # 0 if rects is empty
+                result_dict[key][f"recall_pos@{recall_topk}"] = recall_pos
+            result_dict[key]["recall_total"] = 1
 
         for key, rects in precision_rects.items():
             confidence: float = next(iter(rects))[0]
             if confidence < confidence_threshold:
                 continue
-            precision_pos = 0
-            precision_total = 0
             # old way of calculating precision
             # precision_pos += sum(rect[1] for rect in rects)
             # precision_total += max(1, sum(rect[1] for rect in rects))
-            if any(rect[1] for rect in rects):
-                precision_pos += 1
-            precision_total += 1
-            result_dict[key]["precision_pos"] = precision_pos
-            result_dict[key]["precision_total"] = precision_total
+            result_dict[key]["precision_pos"] = int(any(rect[1] for rect in rects))  # 0 if rects is empty
+            result_dict[key]["precision_total"] = 1
 
         results: list[dict[str, Any]] = []
         for key, metrics in result_dict.items():
@@ -86,13 +77,17 @@ class MMRefEvaluator:
                     "image_id": key[0],
                     "sid": key[1],
                     "base_phrase_index": key[2],
-                    "relation_type": key[3],
+                    "rel_type": key[3],
                     "instance_id_or_pred_idx": key[4],
                     "class_name": key[5],
-                    "recall_pos": metrics.get("recall_pos", 0),
                     "recall_total": metrics.get("recall_total", 0),
                     "precision_pos": metrics.get("precision_pos", 0),
                     "precision_total": metrics.get("precision_total", 0),
+                }
+                | {
+                    "recall_pos"
+                    + (f"@{recall_topk}" if recall_topk >= 0 else ""): metrics.get(f"recall_pos@{recall_topk}", 0)
+                    for recall_topk in recall_top_ks
                 }
             )
         return results
@@ -216,7 +211,7 @@ def parse_args():
         "--prediction-knp-dir", type=Path, default="result/cohesion", help="Path to the prediction directory."
     )
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
-    parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
+    parser.add_argument("--recall-topk", "--topk", type=int, nargs="*", default=-1, help="For calculating Recall@k.")
     parser.add_argument(
         "--confidence-threshold",
         "--th",
@@ -256,7 +251,7 @@ def main():
         )
         textual_results.append(evaluator.eval_textual_reference(pred_document))
         for row in evaluator.eval_visual_reference(
-            prediction, recall_topk=args.recall_topk, confidence_threshold=args.confidence_threshold
+            prediction, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
         ):
             result = {"scenario_id": scenario_id}
             result.update(row)
@@ -268,21 +263,20 @@ def main():
 
     if "rel" in args.eval_modes:
         df_rel = (
-            result_df.groupby("relation_type", maintain_order=True)
+            result_df.groupby("rel_type", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "instance_id_or_pred_idx", "class_name"])
         )
-        df_rel = df_rel.with_columns(
-            [
-                (df_rel["recall_pos"] / df_rel["recall_total"]).alias("recall"),
-                (df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision"),
-            ]
-        )
+        new_columns = [(df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision")]
+        for recall_topk in args.recall_topk:
+            metric_suffix = f"@{recall_topk}" if recall_topk >= 0 else ""
+            new_columns.append(
+                (df_rel["recall_pos" + metric_suffix] / df_rel["recall_total"]).alias("recall" + metric_suffix)
+            )
+        df_rel = df_rel.with_columns(new_columns)
         # sort dataframe by relation type
         df_rel = (
-            df_rel.with_columns(
-                df_rel["relation_type"].apply(lambda x: RELATION_TYPES_ALL.index(x)).alias("case_index")
-            )
+            df_rel.with_columns(df_rel["rel_type"].apply(lambda x: RELATION_TYPES_ALL.index(x)).alias("case_index"))
             .sort("case_index")
             .drop("case_index")
         )
@@ -290,17 +284,18 @@ def main():
 
     if "class" in args.eval_modes:
         df_class = (
-            result_df.filter(pl.col("relation_type") == "=")
+            result_df.filter(pl.col("rel_type") == "=")
             .groupby("class_name", maintain_order=True)
             .sum()
-            .drop(["image_id", "sid", "base_phrase_index", "relation_type", "instance_id_or_pred_idx"])
+            .drop(["image_id", "sid", "base_phrase_index", "rel_type", "instance_id_or_pred_idx"])
         )
-        df_class = df_class.with_columns(
-            [
-                (df_class["recall_pos"] / df_class["recall_total"]).alias("recall"),
-                (df_class["precision_pos"] / df_class["precision_total"]).alias("precision"),
-            ]
-        )
+        new_columns = [(df_class["precision_pos"] / df_class["precision_total"]).alias("precision")]
+        for recall_topk in args.recall_topk:
+            metric_suffix = f"@{recall_topk}" if recall_topk >= 0 else ""
+            new_columns.append(
+                (df_class["recall_pos" + metric_suffix] / df_class["recall_total"]).alias("recall" + metric_suffix)
+            )
+        df_class = df_class.with_columns(new_columns)
         print(df_to_string(df_class, args.format))
 
     if "text" in args.eval_modes:
@@ -313,7 +308,7 @@ def df_to_string(df: pl.DataFrame, format_: str) -> str:
     if format_ == "repr":
         pl.Config.set_tbl_rows(100)
         pl.Config.set_tbl_cols(16)
-        return str(df)
+        return repr(df)
     elif format_ == "csv":
         return df.write_csv()
     elif format_ == "tsv":
