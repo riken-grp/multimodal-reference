@@ -70,7 +70,9 @@ class DeticPhraseGrounding(luigi.Task):
                                 image_id=image.id,
                                 bounding_box=BoundingBoxPrediction(
                                     image_id=image.id,
-                                    rect=Rectangle(*raw_bb[:4]),
+                                    rect=Rectangle(
+                                        x1=raw_bb[0] / 2, y1=raw_bb[1] / 2, x2=raw_bb[2] / 2, y2=raw_bb[3] / 2
+                                    ),
                                     confidence=raw_bb[4],
                                 ),
                             )
