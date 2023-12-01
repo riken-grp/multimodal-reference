@@ -76,7 +76,7 @@ class MultimodalReference(luigi.Task):
         else:
             assert self.cfg.phrase_grounding_model == "detic"
             tasks["grounding"] = DeticPhraseGrounding(
-                cfg=self.cfg.mdetr,
+                cfg=self.cfg.detic,
                 scenario_id=self.scenario_id,
                 document=self.gold_document,
                 dataset_dir=self.dataset_dir,
