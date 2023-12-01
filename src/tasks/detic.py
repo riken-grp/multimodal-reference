@@ -59,7 +59,7 @@ class DeticPhraseGrounding(luigi.Task):
             ]
             for phrase_prediction in phrase_predictions:
                 for image in corresponding_images:
-                    image_idx = int(image.id)
+                    image_idx = int(image.id) - 1
                     raw_bbs: np.ndarray = detic_dump[image_idx * 30]  # (bb, 6)
                     for raw_bb in raw_bbs.tolist():
                         phrase_prediction.relations.append(
