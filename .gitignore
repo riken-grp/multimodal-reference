@@ -175,4 +175,5 @@ configs/*/*.yaml
 !configs/cohesion/example.yaml
 !configs/mdetr/example.yaml
 !configs/glip/example.yaml
+!configs/detic/example.yaml
 !configs/mot/example.yaml

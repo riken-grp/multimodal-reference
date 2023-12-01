@@ -1,0 +1,2 @@
+prediction_dir: ./result/detic
+detic_dump_dir: /path/to/detic/dump/data

@@ -17,8 +17,6 @@ from utils.prediction import (
 )
 from utils.util import DatasetInfo, Rectangle
 
-DETIC_DUMP_DIR = Path("/home/ueda/work/Detic/data")
-
 
 class DeticPhraseGrounding(luigi.Task):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
@@ -35,7 +33,7 @@ class DeticPhraseGrounding(luigi.Task):
 
     def run(self):
         dataset_info = DatasetInfo.from_json(self.dataset_dir.joinpath("info.json").read_text())
-        with DETIC_DUMP_DIR.joinpath(f"{self.scenario_id}.npy").open(mode="rb") as f:
+        with Path(self.cfg.detic_dump_dir).joinpath(f"{self.scenario_id}.npy").open(mode="rb") as f:
             detic_dump: list[np.ndarray] = pickle.load(f)
         # class_names: list[str] = json.loads(Path("lvis_categories.json").read_text())
 
