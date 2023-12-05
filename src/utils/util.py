@@ -1,3 +1,4 @@
+from collections.abc import Hashable
 from dataclasses import dataclass
 from typing import Any, Union
 
@@ -71,11 +72,17 @@ class Rectangle(CamelCaseDataClassJsonMixin):
             raise ValueError("w and h must be positive")
         return cls.from_xyxy(x - w / 2, y - h / 2, x + w / 2, y + h / 2)
 
+    def to_cxcywh(self) -> tuple[int, int, int, int]:
+        return self.center[0], self.center[1], self.w, self.h
+
     @classmethod
     def from_xywh(cls, top_left_x: number, top_left_y: number, w: number, h: number) -> "Rectangle":
         if w < 0 or h < 0:
             raise ValueError("w and h must be positive")
         return cls.from_xyxy(top_left_x, top_left_y, top_left_x + w, top_left_y + h)
+
+    def to_xywh(self) -> tuple[int, int, int, int]:
+        return self.x1, self.y1, self.w, self.h
 
     def __and__(self, other: Any) -> "Rectangle":
         if isinstance(other, type(self)) is False:
@@ -90,3 +97,28 @@ def box_iou(box1: Rectangle, box2: Rectangle) -> float:
         return 0
     intersect: int = (box1 & box2).area
     return intersect / (box1.area + box2.area - intersect)
+
+
+class IdMapper:
+    """Consistently map ids of any type to integers."""
+
+    def __init__(self):
+        self._id_to_int: dict[Hashable, int] = {}
+        self._int_to_id: dict[int, Hashable] = {}
+        self._next_int: int = 0
+
+    def __len__(self) -> int:
+        return len(self._id_to_int)
+
+    def __contains__(self, id_: object) -> bool:
+        return id_ in self._id_to_int
+
+    def __getitem__(self, id_: object) -> int:
+        if id_ not in self._id_to_int:
+            self._id_to_int[id_] = self._next_int
+            self._int_to_id[self._next_int] = id_
+            self._next_int += 1
+        return self._id_to_int[id_]
+
+    def map(self, id_: object) -> int:
+        return self[id_]

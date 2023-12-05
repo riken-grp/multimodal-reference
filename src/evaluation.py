@@ -18,7 +18,7 @@ from utils.constants import CASES, RELATION_TYPES_ALL
 from utils.mot import DetectionLabels
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import PhraseGroundingPrediction
-from utils.util import DatasetInfo, Rectangle, box_iou
+from utils.util import DatasetInfo, IdMapper, Rectangle, box_iou
 
 
 class MMRefEvaluator:
@@ -27,9 +27,7 @@ class MMRefEvaluator:
         self.dataset_info = dataset_info
         self.gold_document = gold_document
         self.utterance_annotations = image_text_annotation.utterances
-        self.image_id_to_annotation: dict[str, ImageAnnotation] = {
-            image.image_id: image for image in image_text_annotation.images
-        }
+        self.image_annotations: list[ImageAnnotation] = image_text_annotation.images
         self.iou_threshold = 0.5
 
     def eval_textual_reference(self, pred_document: Document) -> CohesionScore:
@@ -46,18 +44,25 @@ class MMRefEvaluator:
         return scorer.run()
 
     def eval_mot(self, pred_mot: DetectionLabels) -> motmetrics.MOTAccumulator:
-        _ = pred_mot
-        accumulator = motmetrics.MOTAccumulator(auto_id=True)
-        import numpy as np
+        accumulator = motmetrics.MOTAccumulator(auto_id=True)  # Automatically increment frame id
+        id_mapper = IdMapper()
 
-        accumulator.update(
-            [1, 2],  # Ground truth objects in this frame
-            [1, 2, 3],  # Detector hypotheses in this frame
-            [
-                [0.1, np.nan, 0.3],  # Distances from object 1 to hypotheses 1, 2, 3
-                [0.5, 0.2, 0.3],  # Distances from object 2 to hypotheses 1, 2, 3
-            ],
-        )
+        pred_frames = [pred_mot.frames[i] for i in range(0, len(pred_mot.frames), 30)]
+        assert len(pred_frames) == len(self.image_annotations)
+        for pred_frame, image_annotation in zip(pred_frames, self.image_annotations):
+            distance_matrix = motmetrics.distances.iou_matrix(
+                [bb.rect.to_xywh() for bb in image_annotation.bounding_boxes],  # Ground truth objects in this frame
+                [
+                    (bb.rect.x1 / 2, bb.rect.y1 / 2, bb.rect.w / 2, bb.rect.h / 2) for bb in pred_frame.bounding_boxes
+                ],  # Detector hypotheses in this frame
+                max_iou=0.5,
+            )
+            accumulator.update(
+                [id_mapper[bb.instance_id] for bb in image_annotation.bounding_boxes],
+                [bb.instance_id for bb in pred_frame.bounding_boxes],
+                distance_matrix,
+            )
+
         return accumulator
 
     def eval_visual_reference(
@@ -116,6 +121,7 @@ class MMRefEvaluator:
 
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
+        image_id_to_annotation: dict[str, ImageAnnotation] = {image.image_id: image for image in self.image_annotations}
         assert len(self.dataset_info.utterances) == len(self.utterance_annotations) == len(prediction.utterances)
         all_image_ids = [image.id for image in self.dataset_info.images]
         for idx, (utterance, utterance_annotation, utterance_prediction) in enumerate(
@@ -135,7 +141,7 @@ class MMRefEvaluator:
             ):
                 # 対応する gold と system の BB を取得して比較
                 sid = base_phrase.sentence.sid
-                image_annotation: ImageAnnotation = self.image_id_to_annotation[image_id]
+                image_annotation: ImageAnnotation = image_id_to_annotation[image_id]
                 instance_id_to_bounding_box: dict[str, BoundingBox] = {
                     bb.instance_id: bb for bb in image_annotation.bounding_boxes
                 }
@@ -295,7 +301,9 @@ def main():
         )
         print(
             motmetrics.io.render_summary(
-                summary, formatters=metrics_host.formatters, namemap=motmetrics.io.motchallenge_metric_names
+                summary,
+                formatters=metrics_host.formatters,
+                # namemap=motmetrics.io.motchallenge_metric_names
             )
         )
 
