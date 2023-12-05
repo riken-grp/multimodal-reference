@@ -295,17 +295,11 @@ def main():
         metrics_host: motmetrics.metrics.MetricsHost = motmetrics.metrics.create()
         summary = metrics_host.compute_many(
             eval_results["mot"],
-            metrics=motmetrics.metrics.motchallenge_metrics,
+            metrics=["idf1", "idp", "idr", "recall", "precision", "mota", "motp"],
             names=args.scenario_ids,
             generate_overall=True,
         )
-        print(
-            motmetrics.io.render_summary(
-                summary,
-                formatters=metrics_host.formatters,
-                # namemap=motmetrics.io.motchallenge_metric_names
-            )
-        )
+        print(df_to_string(pl.from_pandas(summary.tail(1)), args.format))
 
     if "rel" not in args.eval_modes and "class" not in args.eval_modes:
         return
