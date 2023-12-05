@@ -7,6 +7,7 @@ from operator import add
 from pathlib import Path
 from typing import Any
 
+import motmetrics
 import polars as pl
 from cohesion_tools.evaluation import CohesionScore, SubCohesionScorer
 from rhoknp import Document
@@ -14,6 +15,7 @@ from rhoknp.cohesion import ExophoraReferent
 
 from utils.annotation import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.constants import CASES, RELATION_TYPES_ALL
+from utils.mot import DetectionLabels
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import PhraseGroundingPrediction
 from utils.util import DatasetInfo, Rectangle, box_iou
@@ -42,6 +44,21 @@ class MMRefEvaluator:
             coreference=True,
         )
         return scorer.run()
+
+    def eval_mot(self, pred_mot: DetectionLabels) -> motmetrics.MOTAccumulator:
+        _ = pred_mot
+        accumulator = motmetrics.MOTAccumulator(auto_id=True)
+        import numpy as np
+
+        accumulator.update(
+            [1, 2],  # Ground truth objects in this frame
+            [1, 2, 3],  # Detector hypotheses in this frame
+            [
+                [0.1, np.nan, 0.3],  # Distances from object 1 to hypotheses 1, 2, 3
+                [0.5, 0.2, 0.3],  # Distances from object 2 to hypotheses 1, 2, 3
+            ],
+        )
+        return accumulator
 
     def eval_visual_reference(
         self, prediction: PhraseGroundingPrediction, recall_top_ks: list[int], confidence_threshold: float = 0.0
@@ -74,6 +91,7 @@ class MMRefEvaluator:
         for key, metrics in result_dict.items():
             results.append(
                 {
+                    "scenario_id": self.dataset_info.scenario_id,
                     "image_id": key[0],
                     "sid": key[1],
                     "base_phrase_index": key[2],
@@ -206,12 +224,15 @@ def parse_args():
         default="data/image_text_annotation",
         help="Path to the gold image text annotation file.",
     )
-    parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction directory.")
+    parser.add_argument("--prediction-dir", "-p", type=Path, required=True, help="Path to the prediction directory.")
     parser.add_argument(
         "--prediction-knp-dir", type=Path, default="result/cohesion", help="Path to the prediction directory."
     )
-    parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
-    parser.add_argument("--recall-topk", "--topk", type=int, nargs="*", default=-1, help="For calculating Recall@k.")
+    parser.add_argument(
+        "--prediction-mot-dir", type=Path, default="result/mot", help="Path to the prediction directory."
+    )
+    parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", required=True, help="List of scenario ids.")
+    parser.add_argument("--recall-topk", "--topk", type=int, nargs="*", default=[], help="For calculating Recall@k.")
     parser.add_argument(
         "--confidence-threshold",
         "--th",
@@ -220,7 +241,12 @@ def parse_args():
         help="Confidence threshold for predicted bounding boxes.",
     )
     parser.add_argument(
-        "--eval-modes", type=str, default="rel", nargs="*", choices=["rel", "class", "text"], help="evaluation modes"
+        "--eval-modes",
+        type=str,
+        default="rel",
+        nargs="*",
+        choices=["rel", "class", "text", "mot"],
+        help="evaluation modes",
     )
     parser.add_argument(
         "--format", type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help="table format to print"
@@ -231,39 +257,59 @@ def parse_args():
 
 def main():
     args = parse_args()
-    textual_results: list[CohesionScore] = []
-    results = []
+    eval_results: dict[str, list[Any]] = defaultdict(list)
     for scenario_id in args.scenario_ids:
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())
         gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
-        pred_document = Document.from_knp(args.prediction_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
         image_text_annotation = ImageTextAnnotation.from_json(
             args.gold_annotation_dir.joinpath(f"{scenario_id}.json").read_text()
         )
-        prediction = PhraseGroundingPrediction.from_json(
-            args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
+        evaluator = MMRefEvaluator(dataset_info, gold_document, image_text_annotation)
+
+        if "text" in args.eval_modes:
+            pred_document = Document.from_knp(args.prediction_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
+            eval_results["text"].append(evaluator.eval_textual_reference(pred_document))
+        if "mot" in args.eval_modes:
+            pred_mot = DetectionLabels.from_json(args.prediction_mot_dir.joinpath(f"{scenario_id}.json").read_text())
+            eval_results["mot"].append(evaluator.eval_mot(pred_mot))
+        if "rel" in args.eval_modes or "class" in args.eval_modes:
+            prediction = PhraseGroundingPrediction.from_json(
+                args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
+            )
+            eval_results["mmref"] += evaluator.eval_visual_reference(
+                prediction, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
+            )
+
+    if "text" in args.eval_modes:
+        textual_reference_result = reduce(add, eval_results["text"])
+        textual_reference_result.export_csv("textual_reference_result.csv")
+        textual_reference_result.export_txt("textual_reference_result.txt")
+
+    if "mot" in args.eval_modes:
+        metrics_host: motmetrics.metrics.MetricsHost = motmetrics.metrics.create()
+        summary = metrics_host.compute_many(
+            eval_results["mot"],
+            metrics=motmetrics.metrics.motchallenge_metrics,
+            names=args.scenario_ids,
+            generate_overall=True,
+        )
+        print(
+            motmetrics.io.render_summary(
+                summary, formatters=metrics_host.formatters, namemap=motmetrics.io.motchallenge_metric_names
+            )
         )
 
-        evaluator = MMRefEvaluator(
-            dataset_info,
-            gold_document,
-            image_text_annotation,
-        )
-        textual_results.append(evaluator.eval_textual_reference(pred_document))
-        for row in evaluator.eval_visual_reference(
-            prediction, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
-        ):
-            result = {"scenario_id": scenario_id}
-            result.update(row)
-            results.append(result)
-    result_df = pl.DataFrame(results)
+    if "rel" not in args.eval_modes and "class" not in args.eval_modes:
+        return
+
+    mmref_result_df = pl.DataFrame(eval_results["mmref"])
     if args.raw_result_csv is not None:
-        result_df.write_csv(args.raw_result_csv)
-    result_df.drop_in_place("scenario_id")
+        mmref_result_df.write_csv(args.raw_result_csv)
+    mmref_result_df.drop_in_place("scenario_id")
 
     if "rel" in args.eval_modes:
         df_rel = (
-            result_df.groupby("rel_type", maintain_order=True)
+            mmref_result_df.groupby("rel_type", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "instance_id_or_pred_idx", "class_name"])
         )
@@ -284,7 +330,7 @@ def main():
 
     if "class" in args.eval_modes:
         df_class = (
-            result_df.filter(pl.col("rel_type") == "=")
+            mmref_result_df.filter(pl.col("rel_type") == "=")
             .groupby("class_name", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "rel_type", "instance_id_or_pred_idx"])
@@ -297,11 +343,6 @@ def main():
             )
         df_class = df_class.with_columns(new_columns)
         print(df_to_string(df_class, args.format))
-
-    if "text" in args.eval_modes:
-        total_textual_result = reduce(add, textual_results)
-        total_textual_result.export_csv("cohesion_result.csv")
-        total_textual_result.export_txt("cohesion_result.txt")
 
 
 def df_to_string(df: pl.DataFrame, format_: str) -> str:
