@@ -1,5 +1,6 @@
 import argparse
 import math
+from dataclasses import dataclass
 from itertools import repeat
 from pathlib import Path
 from typing import Optional, Union
@@ -13,7 +14,7 @@ from rhoknp import BasePhrase, Document, Sentence
 from utils.annotation import ImageAnnotation, ImageTextAnnotation, PhraseAnnotation
 from utils.constants import RELATION_TYPES_ALL
 from utils.prediction import PhraseGroundingPrediction, PhrasePrediction
-from utils.util import DatasetInfo
+from utils.util import DatasetInfo, Rectangle
 
 # colors for visualization
 COLORS = [
@@ -26,6 +27,13 @@ COLORS = [
 ]
 
 GOLD_COLOR = [0.929, 0.694, 0.125]  # yellow
+
+
+@dataclass
+class LabeledRectangle:
+    rect: Rectangle
+    color: list[float]
+    label: str
 
 
 def get_core_expression(unit: Union[BasePhrase]) -> tuple[str, str, str]:
@@ -69,13 +77,44 @@ def plot_results(
     np_image = np.array(image)
     ax = fig.add_subplot(111)
 
+    labeled_rectangles: list[LabeledRectangle] = []
+
     if "pred" in plots:
-        draw_prediction(
-            ax, fig, base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk, relation_types
+        labeled_rectangles += draw_prediction(
+            base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk, relation_types
         )
 
     if "gold" in plots:
-        draw_annotation(ax, base_phrases, image_annotation, phrase_annotations, relation_types, class_names)
+        labeled_rectangles += draw_annotation(
+            base_phrases, image_annotation, phrase_annotations, relation_types, class_names
+        )
+
+    drawn_bbs: set[Bbox] = set()
+    for labeled_rectangle in labeled_rectangles:
+        rect = labeled_rectangle.rect
+        ax.add_patch(
+            plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=labeled_rectangle.color, linewidth=3)
+        )
+        text_box = ax.text(
+            rect.x1,
+            rect.y1,
+            labeled_rectangle.label,
+            fontsize=24,
+            bbox=dict(facecolor=labeled_rectangle.color, alpha=0.8),
+            fontname="Hiragino Maru Gothic Pro",
+        )
+        fig.canvas.draw()
+        bbox_window = text_box.get_window_extent()
+        bbox = bbox_window.transformed(ax.transData.inverted())
+        bbox = Bbox.from_bounds(bbox.x0, bbox.y0, bbox_window.width, bbox_window.height)
+
+        count = 0
+        stride = 10
+        while any(Bbox.intersection(bb, bbox) is not None for bb in drawn_bbs) and count < 50:
+            text_box.set_y(text_box.get_position()[1] - stride)
+            bbox = Bbox.from_bounds(bbox.x0, bbox.y0 - stride, bbox.width, bbox.height)
+            count += 1
+        drawn_bbs.add(bbox)
 
     ax.text(
         -10,
@@ -94,13 +133,13 @@ def plot_results(
 
 
 def draw_annotation(
-    ax: plt.Axes,
     base_phrases: list[BasePhrase],
     image_annotation: ImageAnnotation,
     phrase_annotations: list[PhraseAnnotation],
     relation_types: set[str],
     class_names: Optional[set[str]],
-) -> None:
+) -> list[LabeledRectangle]:
+    ret = []
     for bounding_box in image_annotation.bounding_boxes:
         if class_names is not None and bounding_box.class_name not in class_names:
             continue
@@ -115,30 +154,26 @@ def draw_annotation(
                     labels.append(f"{relation.type}_{get_core_expression(base_phrase)[1]}")
         if not labels:
             continue
-        # color = colors.pop()
-        ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=GOLD_COLOR, linewidth=3))
-        ax.text(
-            rect.x1,
-            rect.y1,
-            ", ".join(labels),
-            fontsize=24,
-            bbox=dict(facecolor=GOLD_COLOR, alpha=0.8),
-            fontname="Hiragino Maru Gothic Pro",
+        ret.append(
+            LabeledRectangle(
+                rect=rect,
+                color=GOLD_COLOR,
+                label=", ".join(labels),
+            )
         )
+    return ret
 
 
 def draw_prediction(
-    ax: plt.Axes,
-    fig,
     base_phrases: list[BasePhrase],
     confidence_threshold: float,
     image_annotation: ImageAnnotation,
     phrase_predictions: list[PhrasePrediction],
     topk: int,
     relation_types: set[str],
-) -> None:
+) -> list[LabeledRectangle]:
     colors = COLORS * 100
-    drawn_bbs: set[Bbox] = set()
+    ret = []
     for phrase_prediction in phrase_predictions:
         target_relation_types: set[str] = {relation.type for relation in phrase_prediction.relations} & relation_types
         for relation_type in target_relation_types:
@@ -159,28 +194,8 @@ def draw_prediction(
                     text=get_core_expression(base_phrase)[1],
                     score=pred_bounding_box.confidence,
                 )
-                color = colors.pop()
-                ax.add_patch(plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=color, linewidth=3))
-                text_box = ax.text(
-                    rect.x1,
-                    rect.y1,
-                    label,
-                    fontsize=24,
-                    bbox=dict(facecolor=color, alpha=0.8),
-                    fontname="Hiragino Maru Gothic Pro",
-                )
-                fig.canvas.draw()
-                bbox_window = text_box.get_window_extent()
-                bbox = bbox_window.transformed(ax.transData.inverted())
-                bbox = Bbox.from_bounds(bbox.x0, bbox.y0, bbox_window.width, bbox_window.height)
-
-                count = 0
-                stride = 10
-                while any(Bbox.intersection(bb, bbox) is not None for bb in drawn_bbs) and count < 50:
-                    text_box.set_y(text_box.get_position()[1] - stride)
-                    bbox = Bbox.from_bounds(bbox.x0, bbox.y0 - stride, bbox.width, bbox.height)
-                    count += 1
-                drawn_bbs.add(bbox)
+                ret.append(LabeledRectangle(rect=rect, color=colors.pop(), label=label))
+    return ret
 
 
 def parse_args():
