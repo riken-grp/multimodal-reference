@@ -103,6 +103,10 @@ class MMRefEvaluator:
                     "rel_type": key[3],
                     "instance_id_or_pred_idx": key[4],
                     "class_name": key[5],
+                    "width": key[6],
+                    "height": key[7],
+                    "center_x": key[8],
+                    "center_y": key[9],
                     "recall_total": metrics.get("recall_total", 0),
                     "precision_pos": metrics.get("precision_pos", 0),
                     "precision_total": metrics.get("precision_total", 0),
@@ -164,6 +168,10 @@ class MMRefEvaluator:
                         relation_type,
                         gold_bounding_box.instance_id,
                         gold_bounding_box.class_name,
+                        gold_bounding_box.rect.w,
+                        gold_bounding_box.rect.h,
+                        gold_bounding_box.rect.cx,
+                        gold_bounding_box.rect.cy,
                     )
                     pred_bounding_boxes: list[BoundingBoxPrediction] = sorted(
                         {rel.bounding_box for rel in pred_relations if rel.type == relation_type},
@@ -200,6 +208,10 @@ class MMRefEvaluator:
                         relation_type,
                         str(rel_idx),
                         "",
+                        pred_box.w,
+                        pred_box.h,
+                        pred_box.cx,
+                        pred_box.cy,
                     )
                     rects = []
                     for gold_bounding_box in gold_bounding_boxes:

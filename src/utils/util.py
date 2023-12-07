@@ -52,8 +52,12 @@ class Rectangle(CamelCaseDataClassJsonMixin):
         return abs(self.y2 - self.y1)
 
     @property
-    def center(self) -> tuple[int, int]:
-        return self.x1 + self.w // 2, self.y1 + self.h // 2
+    def cx(self) -> int:
+        return (self.x1 + self.x2) // 2
+
+    @property
+    def cy(self) -> int:
+        return (self.y1 + self.y2) // 2
 
     @property
     def area(self) -> int:
@@ -73,7 +77,7 @@ class Rectangle(CamelCaseDataClassJsonMixin):
         return cls.from_xyxy(x - w / 2, y - h / 2, x + w / 2, y + h / 2)
 
     def to_cxcywh(self) -> tuple[int, int, int, int]:
-        return self.center[0], self.center[1], self.w, self.h
+        return self.cx, self.cy, self.w, self.h
 
     @classmethod
     def from_xywh(cls, top_left_x: number, top_left_y: number, w: number, h: number) -> "Rectangle":
