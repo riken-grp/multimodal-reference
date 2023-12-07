@@ -72,40 +72,44 @@ def main():
     parser = argparse.ArgumentParser()
     # https://github.com/gregbanks/python-tabulate#table-format
     parser.add_argument("--table-format", default="github", help="Table format.")
-    # parser.add_argument("--recall-topk", "--topk", type=int, default=-1, help="For calculating Recall@k.")
+    parser.add_argument(
+        "--recall-topk", "--topk", type=int, nargs="*", default=[1, 5, 10], help="For calculating Recall@k."
+    )
     args = parser.parse_args()
     eval_config = EvaluationConfig(
         id_file=Path("data/id/test.id"),
     )
     scenario_ids: list[str] = eval_config.id_file.read_text().splitlines()
-    exp_configs = gen_relax_comparison_profile("glip", "ft1")
+    exp_configs = gen_relax_comparison_profile("glip", "ft2_mixed_0.5e")
     data: dict[ExpConfig, list[str]] = {config: [] for config in exp_configs}
     for exp_config in exp_configs:
         exp_name = exp_config.get_name()
         precisions = []
-        for recall_topk in (1, 5, 10):
-            output = subprocess.run(
-                (
-                    f"{sys.executable} src/evaluation.py"
-                    f" -d data/dataset"
-                    f" -k data/knp"
-                    f" -a data/image_text_annotation"
-                    f" -p result/mmref/{exp_name}"
-                    f" --prediction-knp-dir result/cohesion"
-                    f" --scenario-ids {' '.join(scenario_ids)}"
-                    f" --recall-topk {recall_topk}"
-                    f" --eval-modes rel"
-                    f" --format csv"
-                ).split(),
-                capture_output=True,
-                check=True,
-                text=True,
-            )
-            rel_metric_table = pl.read_csv(io.StringIO(output.stdout))
-            df_rel = rel_metric_table.filter(pl.col("relation_type") == "=")
-            recall = RatioMetric(df_rel["recall_pos"][0], df_rel["recall_total"][0])
-            precisions.append(RatioMetric(df_rel["precision_pos"][0], df_rel["precision_total"][0]))
+        output = subprocess.run(
+            (
+                f"{sys.executable} src/evaluation.py"
+                f" -d data/dataset"
+                f" -k data/knp"
+                f" -a data/image_text_annotation"
+                f" -p result/mmref/{exp_name}"
+                f" --prediction-knp-dir result/cohesion"
+                f" --prediction-mot-dir result/mot"
+                f" --scenario-ids {' '.join(scenario_ids)}"
+                f" --recall-topk {' '.join(map(str, args.recall_topk))}"
+                f" --th 0.0"
+                f" --eval-modes rel"
+                f" --format csv"
+            ).split(),
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+        rel_metric_table = pl.read_csv(io.StringIO(output.stdout))
+        df_rel = rel_metric_table.filter(pl.col("rel_type") == "=")
+        for recall_top_k in (1, 5, 10):
+            recall = RatioMetric(df_rel[f"recall_pos@{recall_top_k}"][0], df_rel["recall_total"][0])
             data[exp_config].append(f"{recall.ratio:.3f} ({recall.positive})")
+        precisions.append(RatioMetric(df_rel["precision_pos"][0], df_rel["precision_total"][0]))
         data[exp_config].append(f"{precisions[0].ratio:.3f} ({precisions[0].positive} / {precisions[0].total})")
 
     print(
