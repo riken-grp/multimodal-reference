@@ -63,6 +63,7 @@ def plot_results(
     relation_types: set[str],
     topk: int = -1,
     confidence_threshold: float = 0.0,
+    class_names: Optional[set[str]] = None,
 ) -> None:
     fig = plt.figure(figsize=(16, 10))
     np_image = np.array(image)
@@ -74,7 +75,7 @@ def plot_results(
         )
 
     if "gold" in plots:
-        draw_annotation(ax, base_phrases, image_annotation, phrase_annotations, relation_types)
+        draw_annotation(ax, base_phrases, image_annotation, phrase_annotations, relation_types, class_names)
 
     ax.text(
         -10,
@@ -98,8 +99,11 @@ def draw_annotation(
     image_annotation: ImageAnnotation,
     phrase_annotations: list[PhraseAnnotation],
     relation_types: set[str],
+    class_names: Optional[set[str]],
 ) -> None:
     for bounding_box in image_annotation.bounding_boxes:
+        if class_names is not None and bounding_box.class_name not in class_names:
+            continue
         rect = bounding_box.rect
         labels = []
         for phrase_annotation in phrase_annotations:
@@ -211,6 +215,14 @@ def parse_args():
         default=RELATION_TYPES_ALL,
         help="Relation types to plot.",
     )
+    parser.add_argument(
+        "--confidence-threshold",
+        "--th",
+        type=float,
+        default=0.5,
+        help="Confidence threshold for predicted bounding boxes.",
+    )
+    parser.add_argument("--class-names", type=str, nargs="*", default=None, help="Class names to visualize.")
     return parser.parse_args()
 
 
@@ -232,60 +244,40 @@ def main():
             prediction = PhraseGroundingPrediction.from_json(prediction_file.read_text())
         else:
             prediction = None
-        visualize(
-            export_dir,
-            dataset_info,
-            gold_document,
-            image_dir,
-            image_text_annotation,
-            prediction,
-            args.plots,
-            args.relation_types,
-        )
 
-
-def visualize(
-    export_dir: Path,
-    dataset_info: DatasetInfo,
-    gold_document: Document,
-    image_dir: Path,
-    image_text_annotation: ImageTextAnnotation,
-    prediction: Optional[PhraseGroundingPrediction],
-    plots: list[str],
-    relation_types: list[str],
-) -> None:
-    utterance_annotations = image_text_annotation.utterances
-    image_id_to_annotation = {
-        image_annotation.image_id: image_annotation for image_annotation in image_text_annotation.images
-    }
-    sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in gold_document.sentences}
-    all_image_ids = [image.id for image in dataset_info.images]
-    assert len(dataset_info.utterances) == len(utterance_annotations)
-    for idx, (utterance, utterance_annotation, utterance_prediction) in enumerate(
-        zip(dataset_info.utterances, utterance_annotations, prediction.utterances if prediction else repeat(None))
-    ):
-        base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
-        assert "".join(bp.text for bp in base_phrases) == utterance_annotation.text
-        start_index = math.ceil(utterance.start / 1000)
-        if idx + 1 < len(dataset_info.utterances):
-            next_utterance = dataset_info.utterances[idx + 1]
-            end_index = math.ceil(next_utterance.start / 1000)
-        else:
-            end_index = len(all_image_ids)
-        for image_id in all_image_ids[start_index:end_index]:
-            image_annotation = image_id_to_annotation[image_id]
-            image = Image.open(image_dir / f"{image_annotation.image_id}.png")
-            plot_results(
-                image,
-                image_annotation,
-                utterance_annotation.phrases,
-                utterance_prediction.phrases if utterance_prediction else [],
-                base_phrases,
-                export_dir,
-                confidence_threshold=0.8,
-                plots=plots,
-                relation_types=set(relation_types),
-            )
+        utterance_annotations = image_text_annotation.utterances
+        image_id_to_annotation = {
+            image_annotation.image_id: image_annotation for image_annotation in image_text_annotation.images
+        }
+        sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in gold_document.sentences}
+        all_image_ids = [image.id for image in dataset_info.images]
+        assert len(dataset_info.utterances) == len(utterance_annotations)
+        for idx, (utterance, utterance_annotation, utterance_prediction) in enumerate(
+            zip(dataset_info.utterances, utterance_annotations, prediction.utterances if prediction else repeat(None))
+        ):
+            base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+            assert "".join(bp.text for bp in base_phrases) == utterance_annotation.text
+            start_index = math.ceil(utterance.start / 1000)
+            if idx + 1 < len(dataset_info.utterances):
+                next_utterance = dataset_info.utterances[idx + 1]
+                end_index = math.ceil(next_utterance.start / 1000)
+            else:
+                end_index = len(all_image_ids)
+            for image_id in all_image_ids[start_index:end_index]:
+                image_annotation = image_id_to_annotation[image_id]
+                image = Image.open(image_dir / f"{image_annotation.image_id}.png")
+                plot_results(
+                    image,
+                    image_annotation,
+                    utterance_annotation.phrases,
+                    utterance_prediction.phrases if utterance_prediction else [],
+                    base_phrases,
+                    export_dir,
+                    confidence_threshold=args.confidence_threshold,
+                    plots=args.plots,
+                    relation_types=set(args.relation_types),
+                    class_names=set(args.class_names) if args.class_names is not None else None,
+                )
 
 
 if __name__ == "__main__":
