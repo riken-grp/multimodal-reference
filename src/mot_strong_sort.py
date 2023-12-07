@@ -66,6 +66,7 @@ def main():
         bounding_boxes: list[BoundingBox] = []
         for tracked_bb in tracked_bbs:
             # https://github.com/mikel-brostrom/yolo_tracking#custom-object-detection-model-example
+            # confidence は detection の confidence そのまま
             x1, y1, x2, y2, instance_id, confidence, class_id, _ = tracked_bb.tolist()
             x1, y1, x2, y2, class_id, instance_id = int(x1), int(y1), int(x2), int(y2), int(class_id), int(instance_id)
             color: list[int] = colors[class_id].tolist()
