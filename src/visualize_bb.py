@@ -69,8 +69,8 @@ def plot_results(
     export_dir: Path,
     plots: list[str],
     relation_types: set[str],
-    topk: int = -1,
     confidence_threshold: float = 0.0,
+    topk: int = -1,
     class_names: Optional[set[str]] = None,
 ) -> None:
     fig = plt.figure(figsize=(16, 10))
@@ -189,7 +189,7 @@ def draw_prediction(
                 pred_bounding_box = pred_relation.bounding_box
                 rect = pred_bounding_box.rect
                 base_phrase = next(filter(lambda bp: bp.text == phrase_prediction.text, base_phrases))
-                label = "{type}_{text}: {score:0.3f}".format(
+                label = "{type}_{text}: {score:0.2f}".format(
                     type=pred_relation.type,
                     text=get_core_expression(base_phrase)[1],
                     score=pred_bounding_box.confidence,
@@ -234,9 +234,10 @@ def parse_args():
         "--confidence-threshold",
         "--th",
         type=float,
-        default=0.5,
+        default=0.0,
         help="Confidence threshold for predicted bounding boxes.",
     )
+    parser.add_argument("--topk", type=int, default=-1, help="Visualizing top-k predictions.")
     parser.add_argument("--class-names", type=str, nargs="*", default=None, help="Class names to visualize.")
     return parser.parse_args()
 
@@ -279,18 +280,17 @@ def main():
             else:
                 end_index = len(all_image_ids)
             for image_id in all_image_ids[start_index:end_index]:
-                image_annotation = image_id_to_annotation[image_id]
-                image = Image.open(image_dir / f"{image_annotation.image_id}.png")
                 plot_results(
-                    image,
-                    image_annotation,
-                    utterance_annotation.phrases,
-                    utterance_prediction.phrases if utterance_prediction else [],
-                    base_phrases,
-                    export_dir,
-                    confidence_threshold=args.confidence_threshold,
+                    image=Image.open(image_dir / f"{image_id}.png"),
+                    image_annotation=image_id_to_annotation[image_id],
+                    phrase_annotations=utterance_annotation.phrases,
+                    phrase_predictions=utterance_prediction.phrases if utterance_prediction else [],
+                    base_phrases=base_phrases,
+                    export_dir=export_dir,
                     plots=args.plots,
                     relation_types=set(args.relation_types),
+                    confidence_threshold=args.confidence_threshold,
+                    topk=args.topk,
                     class_names=set(args.class_names) if args.class_names is not None else None,
                 )
 
