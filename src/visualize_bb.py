@@ -81,12 +81,12 @@ def plot_results(
 
     if "pred" in plots:
         labeled_rectangles += draw_prediction(
-            base_phrases, confidence_threshold, image_annotation, phrase_predictions, topk, relation_types
+            base_phrases, phrase_predictions, image_annotation.image_id, confidence_threshold, topk, relation_types
         )
 
     if "gold" in plots:
         labeled_rectangles += draw_annotation(
-            base_phrases, image_annotation, phrase_annotations, relation_types, class_names
+            base_phrases, phrase_annotations, image_annotation, relation_types, class_names
         )
 
     drawn_bbs: set[Bbox] = set()
@@ -134,8 +134,8 @@ def plot_results(
 
 def draw_annotation(
     base_phrases: list[BasePhrase],
-    image_annotation: ImageAnnotation,
     phrase_annotations: list[PhraseAnnotation],
+    image_annotation: ImageAnnotation,
     relation_types: set[str],
     class_names: Optional[set[str]],
 ) -> list[LabeledRectangle]:
@@ -166,9 +166,9 @@ def draw_annotation(
 
 def draw_prediction(
     base_phrases: list[BasePhrase],
-    confidence_threshold: float,
-    image_annotation: ImageAnnotation,
     phrase_predictions: list[PhrasePrediction],
+    image_id: str,
+    confidence_threshold: float,
     topk: int,
     relation_types: set[str],
 ) -> list[LabeledRectangle]:
@@ -180,7 +180,7 @@ def draw_prediction(
             relations = [
                 r
                 for r in phrase_prediction.relations
-                if r.image_id == image_annotation.image_id
+                if r.image_id == image_id
                 and r.type == relation_type
                 and r.bounding_box.confidence >= confidence_threshold
             ]
