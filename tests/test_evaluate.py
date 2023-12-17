@@ -93,12 +93,12 @@ def test_evaluate(fixture_data_dir: Path):
 
     results: list[dict[str, Any]] = evaluator.eval_visual_reference(prediction, recall_top_ks=[-1])
     result_df = pl.DataFrame(results)
-    df_rel = result_df.groupby("relation_type", maintain_order=True).sum()
+    df_rel = result_df.group_by("rel_type", maintain_order=True).sum()
     result = {}
     for rel in ("ガ", "ヲ", "ニ", "ノ", "="):
         result[rel] = {
             k: 0 if v.is_empty() else v.item()
-            for k, v in df_rel.filter(pl.col("relation_type") == rel)
+            for k, v in df_rel.filter(pl.col("rel_type") == rel)
             .select(pl.col("recall_pos", "recall_total", "precision_pos", "precision_total"))
             .to_dict()
             .items()

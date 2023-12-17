@@ -323,7 +323,7 @@ def main():
 
     if "rel" in args.eval_modes:
         df_rel = (
-            mmref_result_df.groupby("rel_type", maintain_order=True)
+            mmref_result_df.group_by("rel_type", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "instance_id_or_pred_idx", "class_name"])
         )
@@ -336,7 +336,9 @@ def main():
         df_rel = df_rel.with_columns(new_columns)
         # sort dataframe by relation type
         df_rel = (
-            df_rel.with_columns(df_rel["rel_type"].apply(lambda x: RELATION_TYPES_ALL.index(x)).alias("case_index"))
+            df_rel.with_columns(
+                df_rel["rel_type"].map_elements(lambda x: RELATION_TYPES_ALL.index(x)).alias("case_index")
+            )
             .sort("case_index")
             .drop("case_index")
         )
@@ -345,7 +347,7 @@ def main():
     if "class" in args.eval_modes:
         df_class = (
             mmref_result_df.filter(pl.col("rel_type") == "=")
-            .groupby("class_name", maintain_order=True)
+            .group_by("class_name", maintain_order=True)
             .sum()
             .drop(["image_id", "sid", "base_phrase_index", "rel_type", "instance_id_or_pred_idx"])
         )
