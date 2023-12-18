@@ -19,6 +19,10 @@ class RelationPrediction(CamelCaseDataClassJsonMixin):
     image_id: str
     bounding_box: BoundingBox
 
+    @property
+    def image_idx(self) -> int:
+        return int(self.image_id) - 1  # zero origin
+
 
 @dataclass
 class PhrasePrediction(CamelCaseDataClassJsonMixin):

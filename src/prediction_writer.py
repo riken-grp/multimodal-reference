@@ -198,21 +198,23 @@ def relax_prediction_with_mot(
                         relations_in_cluster.append(relation)
             if len(relations_in_cluster) == 0:
                 continue
-            confidences = [rel.bounding_box.confidence for rel in relations_in_cluster]
-            if confidence_modification_method == "max":
-                modified_confidence = max(confidences)
-            elif confidence_modification_method == "min":
-                modified_confidence = min(confidences)
-            elif confidence_modification_method == "mean":
-                modified_confidence = mean(confidences)
-            else:
-                raise NotImplementedError
-            print([f"{conf:.6f}" for conf in confidences])
-            for rel in relations_in_cluster:
+            for relation in relations_in_cluster:
+                # 先行するフレームの BB のみ考える
+                confidences = [
+                    rel.bounding_box.confidence for rel in relations_in_cluster if rel.image_idx <= relation.image_idx
+                ]
+                if confidence_modification_method == "max":
+                    modified_confidence = max(confidences)
+                elif confidence_modification_method == "min":
+                    modified_confidence = min(confidences)
+                elif confidence_modification_method == "mean":
+                    modified_confidence = mean(confidences)
+                else:
+                    raise NotImplementedError
                 print(
-                    f"{phrase_grounding_prediction.scenario_id}: {rel.image_id}: {gold_bbs[0].class_name}: confidence: {rel.bounding_box.confidence:.6f} -> {modified_confidence:.6f}"
+                    f"{phrase_grounding_prediction.scenario_id}: {relation.image_id}: {gold_bbs[0].class_name}: confidence: {relation.bounding_box.confidence:.6f} -> {modified_confidence:.6f}"
                 )
-                rel.bounding_box.confidence = modified_confidence
+                relation.bounding_box.confidence = modified_confidence
 
 
 def relax_prediction_with_coreference(
@@ -245,6 +247,7 @@ def relax_prediction_with_pas_bridging(
     phrase_grounding_prediction: PhraseGroundingPrediction,
     parsed_document: Document,
 ) -> PhraseGroundingPrediction:
+    # TODO: 先行する基本句の関係のみを考慮する
     phrase_id_to_relations: dict[int, set[RelationPrediction]] = defaultdict(set)
 
     # convert phrase grounding result to phrase_id_to_relations
