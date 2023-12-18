@@ -224,17 +224,21 @@ def relax_prediction_with_coreference(
     # convert phrase grounding result to phrase_id_to_relations
     for utterance in phrase_grounding_prediction.utterances:
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
+        assert len(base_phrases) == len(utterance.phrases)
         for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
             phrase_id_to_relations[base_phrase.global_index].update(phrase_prediction.relations)
 
     for utterance in phrase_grounding_prediction.utterances:
         base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
         for base_phrase, phrase_prediction in zip(base_phrases, utterance.phrases):
-            coreferents: list[BasePhrase] = base_phrase.get_coreferents(include_nonidentical=False)
-            relations = set(phrase_prediction.relations)
-            for coreferent_base_phrase in coreferents:
-                relations.update(phrase_id_to_relations[coreferent_base_phrase.global_index])
-            phrase_prediction.relations = list(relations)
+            coreferents: list[BasePhrase] = base_phrase.get_coreferents(include_nonidentical=False, include_self=False)
+            new_relations: set[RelationPrediction] = set()
+            for coreferent in coreferents:
+                if coreferent.global_index < base_phrase.global_index:
+                    new_relations.update(phrase_id_to_relations[coreferent.global_index])
+            phrase_prediction.relations = sorted(
+                set(phrase_prediction.relations) | new_relations, key=lambda r: r.image_id
+            )
 
 
 def relax_prediction_with_pas_bridging(
