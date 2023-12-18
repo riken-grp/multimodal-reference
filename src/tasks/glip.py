@@ -69,8 +69,12 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
             end_index = math.ceil(next_utterance.start / 1000)
         else:
             end_index = len(dataset_info.images)
-        corresponding_images = dataset_info.images[start_index:end_index]
-        caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
+        images_in_utterance = dataset_info.images[start_index:end_index]
+        utterances_in_window = dataset_info.utterances[max(0, idx + 1 - cfg.num_utterances_in_window) : idx + 1]
+        doc_window = Document.from_sentences(
+            [sid2sentence[sid] for utterance in utterances_in_window for sid in utterance.sids]
+        )
+        doc_utterance = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
         phrases: list[PhrasePrediction] = [
             PhrasePrediction(
                 sid=base_phrase.sentence.sid,
@@ -78,11 +82,11 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
                 text=base_phrase.text,
                 relations=[],
             )
-            for base_phrase in caption.base_phrases
+            for base_phrase in doc_utterance.base_phrases
         ]
         with tempfile.TemporaryDirectory() as out_dir:
             caption_file = Path(out_dir).joinpath("caption.knp")
-            caption_file.write_text(caption.to_knp())
+            caption_file.write_text(doc_window.to_knp())
             subprocess.run(
                 [
                     cfg.python,
@@ -93,15 +97,15 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
                     f"--export-dir={out_dir}",
                     "--image-files",
                 ]
-                + [str(dataset_dir / image.path) for image in corresponding_images],
+                + [str(dataset_dir / image.path) for image in images_in_utterance],
                 check=True,
                 env=env,
             )
             predictions = [GLIPPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
 
-        assert len(corresponding_images) == len(predictions), f"{len(corresponding_images)} != {len(predictions)}"
-        for image, prediction in zip(corresponding_images, predictions):
-            for phrase, phrase_prediction in zip(phrases, prediction.phrases):
+        assert len(images_in_utterance) == len(predictions), f"{len(images_in_utterance)} != {len(predictions)}"
+        for image, prediction in zip(images_in_utterance, predictions):
+            for phrase, phrase_prediction in zip(phrases, prediction.phrases[-len(phrases) :]):
                 assert phrase_prediction.text == phrase.text
                 assert phrase_prediction.index == phrase.index
                 for bounding_box in phrase_prediction.bounding_boxes:
@@ -117,7 +121,7 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
                             ),
                         )
                     )
-        utterance_predictions.append(UtterancePrediction(text=caption.text, sids=utterance.sids, phrases=phrases))
+        utterance_predictions.append(UtterancePrediction(text=doc_utterance.text, sids=utterance.sids, phrases=phrases))
 
     return PhraseGroundingPrediction(
         scenario_id=dataset_info.scenario_id, images=dataset_info.images, utterances=utterance_predictions
