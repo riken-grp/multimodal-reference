@@ -2,3 +2,7 @@ python: /path/to/python
 project_root: /path/to/project
 name: default
 prediction_dir: ./result/glip/${glip.name}
+
+exp_name: ${.name}
+checkpoint: /path/to/checkpoint
+config: /path/to/config
