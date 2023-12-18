@@ -3,6 +3,7 @@ defaults:
   - cohesion: example.yaml
   - mdetr: example.yaml
   - glip: example.yaml
+  - detic: default.yaml
   - mot: example.yaml
   - _self_
 

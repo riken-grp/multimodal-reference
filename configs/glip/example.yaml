@@ -1,0 +1,4 @@
+python: /path/to/python
+project_root: /path/to/project
+name: default
+prediction_dir: ./result/glip/${glip.name}
