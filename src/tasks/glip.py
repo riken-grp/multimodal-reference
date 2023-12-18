@@ -107,7 +107,6 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
         for image, prediction in zip(images_in_utterance, predictions):
             for phrase, phrase_prediction in zip(phrases, prediction.phrases[-len(phrases) :]):
                 assert phrase_prediction.text == phrase.text
-                assert phrase_prediction.index == phrase.index
                 for bounding_box in phrase_prediction.bounding_boxes:
                     assert bounding_box.image_id == image.id
                     phrase.relations.append(
