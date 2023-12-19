@@ -270,6 +270,7 @@ def parse_args():
         "--format", type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help="table format to print"
     )
     parser.add_argument("--raw-result-csv", type=Path, default=None, help="Path to the raw result csv file.")
+    parser.add_argument("--column-prefixes", type=str, nargs="*", default=None, help="Path to the raw result csv file.")
     return parser.parse_args()
 
 
@@ -322,43 +323,68 @@ def main():
     mmref_result_df.drop_in_place("scenario_id")
 
     if "rel" in args.eval_modes:
-        df_rel = (
-            mmref_result_df.group_by("rel_type", maintain_order=True)
-            .sum()
-            .drop(["image_id", "sid", "base_phrase_index", "instance_id_or_pred_idx", "class_name"])
-        )
-        new_columns = [(df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision")]
-        for recall_topk in args.recall_topk:
-            metric_suffix = f"@{recall_topk}" if recall_topk >= 0 else ""
-            new_columns.append(
-                (df_rel["recall_pos" + metric_suffix] / df_rel["recall_total"]).alias("recall" + metric_suffix)
-            )
-        df_rel = df_rel.with_columns(new_columns)
-        # sort dataframe by relation type
-        df_rel = (
-            df_rel.with_columns(
-                df_rel["rel_type"].map_elements(lambda x: RELATION_TYPES_ALL.index(x)).alias("case_index")
-            )
-            .sort("case_index")
-            .drop("case_index")
-        )
-        print(df_to_string(df_rel, args.format))
+        print_relation_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "class" in args.eval_modes:
-        df_class = (
-            mmref_result_df.filter(pl.col("rel_type") == "=")
-            .group_by("class_name", maintain_order=True)
-            .sum()
-            .drop(["image_id", "sid", "base_phrase_index", "rel_type", "instance_id_or_pred_idx"])
+        print_class_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
+
+
+def print_relation_table(
+    mmref_result_df: pl.DataFrame,
+    recall_top_ks: list[int],
+    column_prefixes: list[str],
+    format_: str = "repr",
+) -> None:
+    df_rel = (
+        mmref_result_df.group_by("rel_type", maintain_order=True)
+        .sum()
+        .drop(["image_id", "sid", "base_phrase_index", "instance_id_or_pred_idx", "class_name"])
+    )
+
+    new_columns = [(df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision")]
+    for recall_top_k in recall_top_ks:
+        metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
+        new_columns.append(
+            (df_rel["recall_pos" + metric_suffix] / df_rel["recall_total"]).alias("recall" + metric_suffix)
         )
-        new_columns = [(df_class["precision_pos"] / df_class["precision_total"]).alias("precision")]
-        for recall_topk in args.recall_topk:
-            metric_suffix = f"@{recall_topk}" if recall_topk >= 0 else ""
-            new_columns.append(
-                (df_class["recall_pos" + metric_suffix] / df_class["recall_total"]).alias("recall" + metric_suffix)
-            )
-        df_class = df_class.with_columns(new_columns)
-        print(df_to_string(df_class, args.format))
+    df_rel = df_rel.with_columns(new_columns)
+    # sort dataframe by relation type
+    df_rel = (
+        df_rel.with_columns(df_rel["rel_type"].map_elements(lambda x: RELATION_TYPES_ALL.index(x)).alias("case_index"))
+        .sort("case_index")
+        .drop("case_index")
+    )
+    if column_prefixes is not None:
+        columns = [column for column in df_rel.columns if column.startswith(tuple(column_prefixes))]
+        assert "rel_type" in columns, "rel_type must be included in column_prefixes"
+        df_rel = df_rel.select(*columns)
+    print(df_to_string(df_rel, format_))
+
+
+def print_class_table(
+    mmref_result_df: pl.DataFrame,
+    recall_top_ks: list[int],
+    column_prefixes: list[str],
+    format_: str = "repr",
+):
+    df_class = (
+        mmref_result_df.filter(pl.col("rel_type") == "=")
+        .group_by("class_name", maintain_order=True)
+        .sum()
+        .drop(["image_id", "sid", "base_phrase_index", "rel_type", "instance_id_or_pred_idx"])
+    )
+    new_columns = [(df_class["precision_pos"] / df_class["precision_total"]).alias("precision")]
+    for recall_top_k in recall_top_ks:
+        metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
+        new_columns.append(
+            (df_class["recall_pos" + metric_suffix] / df_class["recall_total"]).alias("recall" + metric_suffix)
+        )
+    df_class = df_class.with_columns(new_columns)
+    if column_prefixes is not None:
+        columns = [column for column in df_class.columns if column.startswith(tuple(column_prefixes))]
+        assert "rel_type" in columns, "rel_type must be included in column_prefixes"
+        df_class = df_class.select(*columns)
+    print(df_to_string(df_class, format_))
 
 
 def df_to_string(df: pl.DataFrame, format_: str) -> str:
