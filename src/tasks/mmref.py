@@ -66,8 +66,23 @@ class MultimodalReference(luigi.Task):
             tasks["mot"] = MultipleObjectTracking(cfg=self.cfg.mot, scenario_id=self.scenario_id)
         return tasks
 
-    def output(self):
+    def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(self.exp_dir.joinpath(f"{self.scenario_id}.json"))
+
+    def complete(self) -> bool:
+        if not Path(self.output().path).exists():
+            return False
+
+        self_mtime = Path(self.output().path).stat().st_mtime
+        for task in self.requires().values():
+            if not task.complete():
+                return False
+            output = task.output()
+            assert isinstance(output, luigi.LocalTarget), f"output is not LocalTarget: {output}"
+            if Path(output.path).stat().st_mtime > self_mtime:
+                return False
+
+        return True
 
     def run(self):
         with self.input()["cohesion"].open(mode="r") as f:
