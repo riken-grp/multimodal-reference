@@ -9,7 +9,7 @@ from typing import Any
 
 import motmetrics
 import polars as pl
-from cohesion_tools.evaluation import CohesionScore, SubCohesionScorer
+from cohesion_tools.evaluators import CohesionEvaluator, CohesionScore
 from rhoknp import Document
 from rhoknp.cohesion import ExophoraReferent
 
@@ -29,19 +29,21 @@ class MMRefEvaluator:
         self.utterance_annotations = image_text_annotation.utterances
         self.image_annotations: list[ImageAnnotation] = image_text_annotation.images
         self.iou_threshold = 0.5
-
-    def eval_textual_reference(self, pred_document: Document) -> CohesionScore:
-        scorer = SubCohesionScorer(
-            pred_document,
-            self.gold_document,
+        self.cohesion_evaluator = CohesionEvaluator(
+            tasks=["pas", "bridging", "coreference"],
             exophora_referent_types=[ExophoraReferent(e).type for e in "著者 読者 不特定:人 不特定:物".split()],
             pas_cases=list(CASES),
-            pas_verbal=True,
-            pas_nominal=True,
-            bridging=True,
-            coreference=True,
+            bridging_rel_types=["ノ"],
         )
-        return scorer.run()
+        self.cohesion_evaluator.coreference_evaluator.is_target_mention = (
+            lambda mention: mention.features.get("体言") is True
+        )
+
+    def eval_textual_reference(self, pred_document: Document) -> CohesionScore:
+        return self.cohesion_evaluator.run(
+            predicted_documents=[pred_document],
+            gold_documents=[self.gold_document],
+        )
 
     def eval_mot(self, pred_mot: DetectionLabels) -> motmetrics.MOTAccumulator:
         accumulator = motmetrics.MOTAccumulator(auto_id=True)  # Automatically increment frame id
