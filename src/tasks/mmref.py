@@ -23,6 +23,12 @@ from utils.mot import DetectionLabels
 from utils.prediction import PhraseGroundingPrediction, RelationPrediction
 from utils.util import box_iou
 
+PHRASE_GROUNDING_MODEL_MAP: dict[str, type[luigi.Task]] = {
+    "glip": GLIPPhraseGrounding,
+    "mdetr": MDETRPhraseGrounding,
+    "detic": DeticPhraseGrounding,
+}
+
 
 class MultimodalReference(luigi.Task):
     cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
@@ -38,30 +44,14 @@ class MultimodalReference(luigi.Task):
 
     def requires(self) -> dict[str, luigi.Task]:
         tasks: dict[str, luigi.Task] = {
-            "cohesion": CohesionAnalysis(cfg=self.cfg.cohesion, scenario_id=self.scenario_id)
-        }
-        if self.cfg.phrase_grounding_model == "glip":
-            tasks["grounding"] = GLIPPhraseGrounding(
+            "cohesion": CohesionAnalysis(cfg=self.cfg.cohesion, scenario_id=self.scenario_id),
+            "grounding": PHRASE_GROUNDING_MODEL_MAP[self.cfg.phrase_grounding_model](
                 cfg=self.cfg.glip,
                 scenario_id=self.scenario_id,
                 document=self.gold_document,
                 dataset_dir=self.dataset_dir,
-            )
-        elif self.cfg.phrase_grounding_model == "mdetr":
-            tasks["grounding"] = MDETRPhraseGrounding(
-                cfg=self.cfg.mdetr,
-                scenario_id=self.scenario_id,
-                document=self.gold_document,
-                dataset_dir=self.dataset_dir,
-            )
-        else:
-            assert self.cfg.phrase_grounding_model == "detic"
-            tasks["grounding"] = DeticPhraseGrounding(
-                cfg=self.cfg.detic,
-                scenario_id=self.scenario_id,
-                document=self.gold_document,
-                dataset_dir=self.dataset_dir,
-            )
+            ),
+        }
         if self.cfg.mot_relax_mode == "pred":
             tasks["mot"] = MultipleObjectTracking(cfg=self.cfg.mot, scenario_id=self.scenario_id)
         return tasks
