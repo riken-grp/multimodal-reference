@@ -8,7 +8,7 @@ from typing import Annotated
 
 import luigi
 from omegaconf import DictConfig
-from rhoknp import Document, Sentence
+from rhoknp import KNP, Document, Sentence
 
 from tasks.util import FileBasedResourceManagerMixin
 from utils.glip import GLIPPrediction
@@ -86,7 +86,10 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
         ]
         with tempfile.TemporaryDirectory() as out_dir:
             caption_file = Path(out_dir).joinpath("caption.knp")
-            caption_file.write_text(doc_window.to_knp() if cfg.no_query is False else "")
+            if cfg.no_query is False:
+                caption_file.write_text(doc_window.to_knp())
+            else:
+                caption_file.write_text(KNP().apply(Sentence.from_raw_text("もの")).to_knp())
             subprocess.run(
                 [
                     cfg.python,
