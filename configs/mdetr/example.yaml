@@ -1,5 +1,5 @@
 python: /path/to/python
 project_root: /path/to/project
 batch_size: 16
-exp_name: default
-prediction_dir: ./result/mdetr/${mdetr.exp_name}
+name: default
+prediction_dir: ./result/mdetr/${.name}

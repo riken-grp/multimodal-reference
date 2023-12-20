@@ -39,6 +39,8 @@ hydra:
           - luigi.local_scheduler
           - luigi.workers
           - luigi.log_level
+          - glip
+          - mdetr
           - scenario_ids
           - id_file
           - phrase_grounding_model
