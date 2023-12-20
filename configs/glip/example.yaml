@@ -3,6 +3,7 @@ project_root: /path/to/project
 name: default
 prediction_dir: ./result/glip/${glip.name}
 num_utterances_in_window: 4
+no_query: false
 
 exp_name: <glip-exp-name>
 checkpoint: /path/to/checkpoint

@@ -46,7 +46,7 @@ class MMRefEvaluator:
         )
 
     def eval_mot(self, pred_mot: DetectionLabels) -> motmetrics.MOTAccumulator:
-        accumulator = motmetrics.MOTAccumulator(auto_id=True)  # Automatically increment frame id
+        accumulator = motmetrics.MOTAccumulator(auto_id=True)  # `auto_id=True`: Automatically increment frame id
         id_mapper = IdMapper()
 
         pred_frames = [pred_mot.frames[i] for i in range(0, len(pred_mot.frames), 30)]

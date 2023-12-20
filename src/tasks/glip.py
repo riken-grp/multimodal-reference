@@ -86,7 +86,7 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
         ]
         with tempfile.TemporaryDirectory() as out_dir:
             caption_file = Path(out_dir).joinpath("caption.knp")
-            caption_file.write_text(doc_window.to_knp())
+            caption_file.write_text(doc_window.to_knp() if cfg.no_query is False else "")
             subprocess.run(
                 [
                     cfg.python,
