@@ -37,6 +37,7 @@ class CohesionAnalysis(luigi.Task, FileBasedResourceManagerMixin[int]):
         try:
             env = os.environ.copy()
             env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+            env["DATA_DIR"] = f"{cfg.project_root}/data"
 
             with tempfile.TemporaryDirectory() as out_dir:
                 subprocess.run(
