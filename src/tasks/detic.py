@@ -60,6 +60,7 @@ class DeticPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
                     f"--config-file={cfg.config}",
                     f"--video-input={input_video_file.resolve()}",
                     "--vocabulary=lvis",
+                    f"--confidence-threshold={cfg.confidence_threshold}",
                     f"--output={dump_file.resolve()}",
                     "--opts",
                     "MODEL.WEIGHTS",

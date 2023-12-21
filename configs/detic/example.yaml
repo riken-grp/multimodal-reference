@@ -1,7 +1,11 @@
+project_root: /path/to/project
 python: /path/to/python
-project_dir: /path/to/project
-config: /path/to/config/file
-model: /path/to/model/checkpoint
-recording_dir: /path/to/recording/directory
-prediction_dir: ./result/detic
-dump_dir: /path/to/detic/dump/directory
+name: default
+recording_dir: ./data/recording
+prediction_dir: ./result/detic/${.name}
+dump_dir: ${.prediction_dir}/dump
+
+exp_name: Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size
+config: ${.project_root}/configs/${.exp_name}.yaml
+model: ${.project_root}/models/${.exp_name}.pth
+confidence_threshold: 0.5

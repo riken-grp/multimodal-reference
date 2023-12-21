@@ -1,7 +1,7 @@
 python: /path/to/python
 project_root: /path/to/project
 name: default
-prediction_dir: ./result/glip/${glip.name}
+prediction_dir: ./result/glip/${.name}
 num_utterances_in_window: 4
 no_query: false
 
