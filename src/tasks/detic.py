@@ -1,5 +1,7 @@
 import math
+import os
 import pickle
+import socket
 import subprocess
 from pathlib import Path
 from typing import Annotated
@@ -9,6 +11,7 @@ import numpy as np
 from omegaconf import DictConfig
 from rhoknp import Document, Sentence
 
+from tasks.util import FileBasedResourceManagerMixin
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import (
     PhraseGroundingPrediction,
@@ -19,7 +22,7 @@ from utils.prediction import (
 from utils.util import DatasetInfo, Rectangle
 
 
-class DeticPhraseGrounding(luigi.Task):
+class DeticPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
     cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
     document: Annotated[Document, luigi.Parameter()] = luigi.Parameter()
@@ -27,6 +30,10 @@ class DeticPhraseGrounding(luigi.Task):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        available_gpus = [int(gpu_id) for gpu_id in os.environ.get("AVAILABLE_GPUS", "0").split(",")]
+        super(luigi.Task, self).__init__(
+            available_gpus, Path("shared_state.json"), state_prefix=f"{socket.gethostname()}_gpu"
+        )
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def output(self):
@@ -35,25 +42,36 @@ class DeticPhraseGrounding(luigi.Task):
     def run(self):
         dataset_info = DatasetInfo.from_json(self.dataset_dir.joinpath("info.json").read_text())
         cfg = self.cfg
-
         dump_file = Path(cfg.dump_dir) / f"{self.scenario_id}.npy"
         dump_file.parent.mkdir(exist_ok=True, parents=True)
         input_video_file = Path(cfg.recording_dir) / self.scenario_id / "fp_video.mp4"
-        subprocess.run(
-            [
-                cfg.python,
-                f"{cfg.project_root}/export.py",
-                f"--config-file={cfg.config}",
-                f"--video-input={input_video_file.resolve()}",
-                "--vocabulary=lvis",
-                f"--output={dump_file.resolve()}",
-                "--opts",
-                "MODEL.WEIGHTS",
-                cfg.model,
-            ],
-            cwd=cfg.project_root,
-            check=True,
-        )
+
+        gpu_id = self.acquire_resource()
+        if gpu_id is None:
+            raise RuntimeError("No available GPU.")
+        try:
+            env = os.environ.copy()
+            env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
+            subprocess.run(
+                [
+                    cfg.python,
+                    f"{cfg.project_root}/export.py",
+                    f"--config-file={cfg.config}",
+                    f"--video-input={input_video_file.resolve()}",
+                    "--vocabulary=lvis",
+                    f"--output={dump_file.resolve()}",
+                    "--opts",
+                    "MODEL.WEIGHTS",
+                    cfg.model,
+                ],
+                cwd=cfg.project_root,
+                env=env,
+                check=True,
+            )
+        finally:
+            self.release_resource(gpu_id)
+
         with dump_file.open(mode="rb") as f:
             detic_dump: list[np.ndarray] = pickle.load(f)
 
