@@ -53,7 +53,7 @@ class MultimodalReference(luigi.Task):
             ),
         }
         if self.cfg.mot_relax_mode == "pred":
-            tasks["mot"] = MultipleObjectTracking(cfg=self.cfg.mot, scenario_id=self.scenario_id)
+            tasks["mot"] = MultipleObjectTracking(cfg=self.cfg, scenario_id=self.scenario_id)
         return tasks
 
     def output(self) -> luigi.LocalTarget:

@@ -1,5 +1,5 @@
-python: /path/to/python
 project_root: /path/to/project
-video_dir: ./data/recording
-detic_dump_dir: /path/to/detic/dump
+python: /path/to/python
+recording_dir: ./data/recording
+detic_dump_dir: ${detic.dump_dir}
 prediction_dir: ./result/mot
