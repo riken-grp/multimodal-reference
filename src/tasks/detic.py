@@ -37,19 +37,21 @@ class DeticPhraseGrounding(luigi.Task):
         cfg = self.cfg
 
         dump_file = Path(cfg.dump_dir) / f"{self.scenario_id}.npy"
+        dump_file.parent.mkdir(exist_ok=True, parents=True)
         input_video_file = Path(cfg.recording_dir) / self.scenario_id / "fp_video.mp4"
         subprocess.run(
             [
                 cfg.python,
                 f"{cfg.project_root}/export.py",
                 f"--config-file={cfg.config}",
-                f"--video-input={input_video_file}",
+                f"--video-input={input_video_file.resolve()}",
                 "--vocabulary=lvis",
-                f"--output={dump_file}",
+                f"--output={dump_file.resolve()}",
                 "--opts",
                 "MODEL.WEIGHTS",
                 cfg.model,
             ],
+            cwd=cfg.project_root,
             check=True,
         )
         with dump_file.open(mode="rb") as f:
