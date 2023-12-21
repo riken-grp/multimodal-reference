@@ -6,7 +6,7 @@ import luigi
 from omegaconf import DictConfig
 from rhoknp import Document
 
-from tasks import DeticPhraseGrounding
+from tasks.detic import DeticPhraseGrounding
 
 
 class MultipleObjectTracking(luigi.Task):

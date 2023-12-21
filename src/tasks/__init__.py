@@ -2,7 +2,8 @@ from tasks.cohesion import CohesionAnalysis
 from tasks.detic import DeticPhraseGrounding
 from tasks.glip import GLIPPhraseGrounding
 from tasks.mdetr import MDETRPhraseGrounding
-from tasks.mmref import MultimodalReference
+
+# from tasks.mmref import MultimodalReference
 from tasks.mot import MultipleObjectTracking
 
 __all__ = [
@@ -11,5 +12,5 @@ __all__ = [
     "GLIPPhraseGrounding",
     "DeticPhraseGrounding",
     "MultipleObjectTracking",
-    "MultimodalReference",
+    # "MultimodalReference",
 ]
