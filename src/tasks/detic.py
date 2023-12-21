@@ -1,5 +1,6 @@
 import math
 import pickle
+import subprocess
 from pathlib import Path
 from typing import Annotated
 
@@ -33,9 +34,26 @@ class DeticPhraseGrounding(luigi.Task):
 
     def run(self):
         dataset_info = DatasetInfo.from_json(self.dataset_dir.joinpath("info.json").read_text())
-        with Path(self.cfg.detic_dump_dir).joinpath(f"{self.scenario_id}.npy").open(mode="rb") as f:
+        cfg = self.cfg
+
+        dump_file = Path(cfg.dump_dir) / f"{self.scenario_id}.npy"
+        input_video_file = Path(cfg.recording_dir) / self.scenario_id / "fp_video.mp4"
+        subprocess.run(
+            [
+                cfg.python,
+                f"{cfg.project_root}/export.py",
+                f"--config-file={cfg.config}",
+                f"--video-input={input_video_file}",
+                "--vocabulary=lvis",
+                f"--output={dump_file}",
+                "--opts",
+                "MODEL.WEIGHTS",
+                cfg.model,
+            ],
+            check=True,
+        )
+        with dump_file.open(mode="rb") as f:
             detic_dump: list[np.ndarray] = pickle.load(f)
-        # class_names: list[str] = json.loads(Path("lvis_categories.json").read_text())
 
         utterance_predictions: list[UtterancePrediction] = []
         sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in self.document.sentences}

@@ -1,2 +1,7 @@
+python: /path/to/python
+project_dir: /path/to/project
+config: /path/to/config/file
+model: /path/to/model/checkpoint
+recording_dir: /path/to/recording/directory
 prediction_dir: ./result/detic
-detic_dump_dir: /path/to/detic/dump/data
+dump_dir: /path/to/detic/dump/directory
