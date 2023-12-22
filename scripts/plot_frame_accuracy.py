@@ -101,7 +101,7 @@ def visualize(comparison_table: pl.DataFrame, scenario_id: str, output_file: Pat
         color="instance_id",
         labels={"x": "Frame Number", "y": "Rank"},
         markers=True,
-        width=720,
+        width=960,
         height=480,
     )
 
