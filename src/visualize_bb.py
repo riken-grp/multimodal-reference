@@ -1,7 +1,7 @@
 import argparse
 import math
 from dataclasses import dataclass
-from itertools import repeat
+from itertools import cycle, repeat
 from pathlib import Path
 from typing import Optional, Union
 
@@ -172,7 +172,7 @@ def draw_prediction(
     topk: int,
     relation_types: set[str],
 ) -> list[LabeledRectangle]:
-    colors = COLORS * 100
+    colors = cycle(COLORS)
     ret = []
     for phrase_prediction in phrase_predictions:
         target_relation_types: set[str] = {relation.type for relation in phrase_prediction.relations} & relation_types
@@ -194,7 +194,7 @@ def draw_prediction(
                     text=get_core_expression(base_phrase)[1],
                     score=pred_bounding_box.confidence,
                 )
-                ret.append(LabeledRectangle(rect=rect, color=colors.pop(), label=label))
+                ret.append(LabeledRectangle(rect=rect, color=next(colors), label=label))
     return ret
 
 
