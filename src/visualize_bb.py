@@ -200,6 +200,7 @@ def draw_prediction(
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("exp_name", type=str, help="Experiment name (directory name under --export-dir)")
     parser.add_argument(
         "--dataset-dir",
         "-d",
@@ -215,8 +216,16 @@ def parse_args():
         default="data/image_text_annotation",
         help="Path to the gold image text annotation file.",
     )
-    parser.add_argument("--export-dir", "-e", type=Path, help="Path to the directory where tagged images are exported")
-    parser.add_argument("--prediction-dir", "-p", type=Path, help="Path to the prediction file.")
+    parser.add_argument(
+        "--export-dir",
+        "-e",
+        type=Path,
+        default="data/bb",
+        help="Path to the directory where tagged images are exported",
+    )
+    parser.add_argument(
+        "--prediction-dir", "-p", type=Path, default="result/mmref", help="Path to the prediction file."
+    )
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", help="List of scenario ids.")
     parser.add_argument(
         "--plots", type=str, nargs="*", choices=["gold", "pred"], default=["gold", "pred"], help="Plotting target."
@@ -245,7 +254,7 @@ def parse_args():
 def main():
     args = parse_args()
     for scenario_id in args.scenario_ids:
-        export_dir = args.export_dir / scenario_id
+        export_dir = args.export_dir / args.exp_name / scenario_id
         export_dir.mkdir(parents=True, exist_ok=True)
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())
         image_dir = args.dataset_dir / scenario_id / "images"
@@ -253,12 +262,11 @@ def main():
         image_text_annotation = ImageTextAnnotation.from_json(
             args.image_annotation_dir.joinpath(f"{scenario_id}.json").read_text()
         )
-        if (
-            args.prediction_dir is not None
-            and (prediction_file := args.prediction_dir.joinpath(f"{scenario_id}.json")).exists()
-        ):
+        prediction_file = args.prediction_dir / args.exp_name / f"{scenario_id}.json"
+        if prediction_file.exists():
             prediction = PhraseGroundingPrediction.from_json(prediction_file.read_text())
         else:
+            print(f"Warning: {prediction_file} does not exist.")
             prediction = None
 
         utterance_annotations = image_text_annotation.utterances
