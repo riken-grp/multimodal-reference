@@ -5,7 +5,7 @@ from collections import defaultdict
 from functools import reduce
 from operator import add
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Optional
 
 import motmetrics
 import polars as pl
@@ -68,9 +68,13 @@ class MMRefEvaluator:
         return accumulator
 
     def eval_visual_reference(
-        self, prediction: PhraseGroundingPrediction, recall_top_ks: list[int], confidence_threshold: float = 0.0
+        self,
+        prediction: PhraseGroundingPrediction,
+        recall_top_ks: list[int],
+        confidence_threshold: float = 0.0,
+        image_span: Literal["past", "current", "all"] = "current",
     ) -> list[dict[str, Any]]:
-        recall_rects, precision_rects = self._compare_prediction_and_annotation(prediction)
+        recall_rects, precision_rects = self._compare_prediction_and_annotation(prediction, image_span=image_span)
 
         result_dict: dict[tuple[str, str, int, str, str, str], dict[str, Any]] = defaultdict(dict)
 
@@ -100,28 +104,33 @@ class MMRefEvaluator:
                 {
                     "scenario_id": self.dataset_info.scenario_id,
                     "image_id": key[0],
-                    "sid": key[1],
-                    "base_phrase_index": key[2],
-                    "rel_type": key[3],
-                    "instance_id_or_pred_idx": key[4],
-                    "class_name": key[5],
-                    "width": key[6],
-                    "height": key[7],
-                    "center_x": key[8],
-                    "center_y": key[9],
+                    "utterance_id": key[1],
+                    "sid": key[2],
+                    "base_phrase_index": key[3],
+                    "rel_type": key[4],
+                    "instance_id_or_pred_idx": key[5],
+                    "class_name": key[6],
+                    "width": key[7],
+                    "height": key[8],
+                    "center_x": key[9],
+                    "center_y": key[10],
                     "recall_total": metrics.get("recall_total", 0),
                     "precision_pos": metrics.get("precision_pos", 0),
                     "precision_total": metrics.get("precision_total", 0),
                 }
                 | {
                     "recall_pos"
-                    + (f"@{recall_topk}" if recall_topk >= 0 else ""): metrics.get(f"recall_pos@{recall_topk}", 0)
-                    for recall_topk in recall_top_ks
+                    + (f"@{recall_top_k}" if recall_top_k >= 0 else ""): metrics.get(f"recall_pos@{recall_top_k}", 0)
+                    for recall_top_k in recall_top_ks
                 }
             )
         return results
 
-    def _compare_prediction_and_annotation(self, prediction: PhraseGroundingPrediction) -> tuple[dict, dict]:
+    def _compare_prediction_and_annotation(
+        self,
+        prediction: PhraseGroundingPrediction,
+        image_span: Literal["past", "current", "all"] = "current",
+    ) -> tuple[dict, dict]:
         recall_rects: dict[tuple, list[tuple[float, bool]]] = {}
         precision_rects: dict[tuple, list[tuple[float, bool]]] = {}
 
@@ -136,13 +145,22 @@ class MMRefEvaluator:
             base_phrases = [bp for sid in utterance.sids for bp in sid2sentence[sid].base_phrases]
             assert "".join(bp.text for bp in base_phrases) == utterance_annotation.text == utterance_prediction.text
             start_index = math.ceil(utterance.start / 1000)
+            end_index = math.ceil(utterance.end / 1000)
             if idx + 1 < len(self.dataset_info.utterances):
                 next_utterance = self.dataset_info.utterances[idx + 1]
-                end_index = math.ceil(next_utterance.start / 1000)
+                next_start_index = math.ceil(next_utterance.start / 1000)
             else:
-                end_index = len(all_image_ids)
+                next_start_index = len(all_image_ids)
+            if image_span == "past":
+                image_ids = all_image_ids[:end_index]
+            elif image_span == "current":
+                image_ids = all_image_ids[start_index:next_start_index]
+            elif image_span == "all":
+                image_ids = all_image_ids
+            else:
+                raise ValueError(f"Unknown image_span: {image_span}")
             for image_id, (base_phrase, phrase_annotation, phrase_prediction) in itertools.product(
-                all_image_ids[start_index:end_index],
+                image_ids,
                 zip(base_phrases, utterance_annotation.phrases, utterance_prediction.phrases),
             ):
                 # 対応する gold と system の BB を取得して比較
@@ -165,6 +183,7 @@ class MMRefEvaluator:
                         continue
                     key = (
                         image_id,
+                        f"{utterance.speaker}_{idx:02}",
                         sid,
                         base_phrase.index,
                         relation_type,
@@ -205,6 +224,7 @@ class MMRefEvaluator:
                     ]
                     key = (
                         image_id,
+                        f"{utterance.speaker}_{idx:02}",
                         sid,
                         base_phrase.index,
                         relation_type,
@@ -251,6 +271,9 @@ def parse_args():
     parser.add_argument(
         "--prediction-mot-dir", type=Path, default="result/mot", help="Path to the prediction directory."
     )
+    parser.add_argument(
+        "--prediction-detection-dir", type=Path, default="result/detic/th0.5", help="Path to the prediction directory."
+    )
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", required=True, help="List of scenario ids.")
     parser.add_argument("--recall-topk", "--topk", type=int, nargs="*", default=[], help="For calculating Recall@k.")
     parser.add_argument(
@@ -263,10 +286,10 @@ def parse_args():
     parser.add_argument(
         "--eval-modes",
         type=str,
-        default="rel",
-        nargs="*",
-        choices=["rel", "class", "text", "mot"],
-        help="evaluation modes",
+        default=["rel"],
+        nargs="+",
+        choices=["rel", "class", "text", "mot", "detection"],
+        help="Evaluation modes.",
     )
     parser.add_argument(
         "--format", type=str, default="repr", choices=["repr", "csv", "tsv", "json"], help="table format to print"
@@ -293,7 +316,17 @@ def main():
         if "mot" in args.eval_modes:
             pred_mot = DetectionLabels.from_json(args.prediction_mot_dir.joinpath(f"{scenario_id}.json").read_text())
             eval_results["mot"].append(evaluator.eval_mot(pred_mot))
-        if "rel" in args.eval_modes or "class" in args.eval_modes:
+        if "detection" in args.eval_modes:
+            pred_detection = PhraseGroundingPrediction.from_json(
+                args.prediction_detection_dir.joinpath(f"{scenario_id}.json").read_text()
+            )
+            eval_results["detection"] += evaluator.eval_visual_reference(
+                pred_detection,
+                recall_top_ks=args.recall_topk,
+                confidence_threshold=args.confidence_threshold,
+                image_span="all",
+            )
+        if "rel" in args.eval_modes or "class" in args.eval_modes or "detection" in args.eval_modes:
             prediction = PhraseGroundingPrediction.from_json(
                 args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
             )
@@ -316,19 +349,57 @@ def main():
         )
         print(df_to_string(pl.from_pandas(summary.tail(1)), args.format))
 
-    if "rel" not in args.eval_modes and "class" not in args.eval_modes:
+    if "rel" not in args.eval_modes and "class" not in args.eval_modes and "detection" not in args.eval_modes:
         return
 
     mmref_result_df = pl.DataFrame(eval_results["mmref"])
     if args.raw_result_csv is not None:
         mmref_result_df.write_csv(args.raw_result_csv)
-    mmref_result_df.drop_in_place("scenario_id")
 
     if "rel" in args.eval_modes:
         print_relation_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "class" in args.eval_modes:
         print_class_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
+
+    if "detection" in args.eval_modes:
+        mmref_result_df = pl.DataFrame(eval_results["detection"])
+        grouped_df = mmref_result_df.group_by(["scenario_id", "image_id", "instance_id_or_pred_idx"])
+        decimated_dfs = []
+        for _, specific_utterance_df in grouped_df:
+            specific_sentence_df = specific_utterance_df.filter(pl.col("sid") == specific_utterance_df["sid"][0])
+            specific_phrase_df = specific_sentence_df.filter(
+                pl.col("base_phrase_index") == specific_sentence_df["base_phrase_index"][0]
+            )
+            decimated_dfs.append(specific_phrase_df)
+
+        df_detection = pl.concat(decimated_dfs, how="vertical")
+        # df_detection = df_detection.filter(pl.col("image_id") == "015")  # debug
+        # df_detection.write_csv("debug.csv")
+        df_detection: pl.DataFrame = df_detection.sum().drop(
+            [
+                "scenario_id",
+                "image_id",
+                "utterance_id",
+                "sid",
+                "base_phrase_index",
+                "instance_id_or_pred_idx",
+                "class_name",
+                "precision_pos",
+                "precision_total",
+            ]
+        )
+
+        new_columns = []
+        for recall_top_k in args.recall_topk:
+            metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
+            new_columns.append(
+                (df_detection["recall_pos" + metric_suffix] / df_detection["recall_total"]).alias(
+                    "recall" + metric_suffix
+                )
+            )
+        df_detection = df_detection.with_columns(new_columns)
+        print(df_to_string(df_detection, args.format, args.column_prefixes))
 
 
 def print_relation_table(
@@ -340,7 +411,17 @@ def print_relation_table(
     df_rel = (
         mmref_result_df.group_by("rel_type", maintain_order=True)
         .sum()
-        .drop(["image_id", "sid", "base_phrase_index", "instance_id_or_pred_idx", "class_name"])
+        .drop(
+            [
+                "scenario_id",
+                "image_id",
+                "utterance_id",
+                "sid",
+                "base_phrase_index",
+                "instance_id_or_pred_idx",
+                "class_name",
+            ]
+        )
     )
 
     new_columns = [(df_rel["precision_pos"] / df_rel["precision_total"]).alias("precision")]
@@ -356,11 +437,7 @@ def print_relation_table(
         .sort("case_index")
         .drop("case_index")
     )
-    if column_prefixes is not None:
-        columns = [column for column in df_rel.columns if column.startswith(tuple(column_prefixes))]
-        assert "rel_type" in columns, "rel_type must be included in column_prefixes"
-        df_rel = df_rel.select(*columns)
-    print(df_to_string(df_rel, format_))
+    print(df_to_string(df_rel, format_, column_prefixes))
 
 
 def print_class_table(
@@ -373,7 +450,17 @@ def print_class_table(
         mmref_result_df.filter(pl.col("rel_type") == "=")
         .group_by("class_name", maintain_order=True)
         .sum()
-        .drop(["image_id", "sid", "base_phrase_index", "rel_type", "instance_id_or_pred_idx"])
+        .drop(
+            [
+                "scenario_id",
+                "image_id",
+                "utterance_id",
+                "sid",
+                "base_phrase_index",
+                "rel_type",
+                "instance_id_or_pred_idx",
+            ]
+        )
     )
     new_columns = [(df_class["precision_pos"] / df_class["precision_total"]).alias("precision")]
     for recall_top_k in recall_top_ks:
@@ -382,24 +469,24 @@ def print_class_table(
             (df_class["recall_pos" + metric_suffix] / df_class["recall_total"]).alias("recall" + metric_suffix)
         )
     df_class = df_class.with_columns(new_columns)
+    print(df_to_string(df_class, format_, column_prefixes))
+
+
+def df_to_string(table: pl.DataFrame, format_: str, column_prefixes: Optional[list] = None) -> str:
     if column_prefixes is not None:
-        columns = [column for column in df_class.columns if column.startswith(tuple(column_prefixes))]
+        columns = [column for column in table.columns if column.startswith(tuple(column_prefixes))]
         assert "rel_type" in columns, "rel_type must be included in column_prefixes"
-        df_class = df_class.select(*columns)
-    print(df_to_string(df_class, format_))
-
-
-def df_to_string(df: pl.DataFrame, format_: str) -> str:
+        table = table.select(*columns)
     if format_ == "repr":
         pl.Config.set_tbl_rows(100)
         pl.Config.set_tbl_cols(16)
-        return repr(df)
+        return repr(table)
     elif format_ == "csv":
-        return df.write_csv()
+        return table.write_csv()
     elif format_ == "tsv":
-        return df.write_csv(separator="\t")
+        return table.write_csv(separator="\t")
     elif format_ == "json":
-        return df.write_json()
+        return table.write_json()
     else:
         raise ValueError(f"Unknown format: {format_}")
 
