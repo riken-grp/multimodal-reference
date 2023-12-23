@@ -78,10 +78,10 @@ class MMRefEvaluator:
             rects: list[tuple[float, bool]] = sorted(orig_rects, key=lambda x: x[0], reverse=True)
             if confidence_threshold >= 0:
                 rects = [rect for rect in rects if rect[0] >= confidence_threshold]
-            for recall_topk in recall_top_ks:
-                topk_rects = rects[:recall_topk] if recall_topk >= 0 else rects
-                recall_pos = int(any(rect[1] for rect in topk_rects))  # 0 if rects is empty
-                result_dict[key][f"recall_pos@{recall_topk}"] = recall_pos
+            for recall_top_k in recall_top_ks:
+                top_k_rects = rects[:recall_top_k] if recall_top_k >= 0 else rects
+                recall_pos = int(any(rect[1] for rect in top_k_rects))  # 0 if rects is empty
+                result_dict[key][f"recall_pos@{recall_top_k}"] = recall_pos
             result_dict[key]["recall_total"] = 1
 
         for key, rects in precision_rects.items():
