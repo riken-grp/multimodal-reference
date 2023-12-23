@@ -1,3 +1,4 @@
+import argparse
 import io
 import subprocess
 import sys
@@ -12,30 +13,32 @@ MAX_CLASSES_TO_SHOW = 20
 
 
 def main() -> None:
-    project_root = Path.cwd()
-    interpreter = sys.executable
-    scenario_ids: list[str] = (
-        project_root.joinpath("data/id/test.id").read_text().splitlines()
-        + project_root.joinpath("data/id/valid.id").read_text().splitlines()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("exp_name", type=str, help="Experiment name (directory name under result/mmref)")
+    parser.add_argument(
+        "--id-file", type=Path, nargs="+", default=[Path("data/id/test.id")], help="Paths to scenario id file"
     )
-    exp_name = sys.argv[1]
+    args = parser.parse_args()
+    scenario_ids: list[str] = sum((path.read_text().splitlines() for path in args.id_file), [])
     output = subprocess.run(
         (
-            f"{interpreter} src/evaluation.py -p result/mmref/{exp_name} --scenario-ids {' '.join(scenario_ids)}"
+            f"{sys.executable} src/evaluation.py -p result/mmref/{args.exp_name} --scenario-ids {' '.join(scenario_ids)}"
             f" --recall-topk {' '.join(map(str, RECALL_TOP_KS))} --th 0.0 --eval-modes class --format csv"
         ).split(),
         capture_output=True,
-        cwd=project_root,
+        cwd=Path.cwd(),
         check=True,
         text=True,
     )
     class_score_table = pl.read_csv(io.StringIO(output.stdout))
-    visualize(class_score_table)
+    output_dir = Path("data") / "recall_distribution"
+    output_dir.mkdir(exist_ok=True)
+    visualize(class_score_table, output_dir / f"{args.exp_name}.pdf")
 
 
-def visualize(class_score_table: pl.DataFrame) -> None:
-    for recall_topk in RECALL_TOP_KS:
-        metric_suffix = f"@{recall_topk}" if recall_topk >= 0 else ""
+def visualize(class_score_table: pl.DataFrame, output_file: Path) -> None:
+    for recall_top_k in RECALL_TOP_KS:
+        metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
         class_score_table = class_score_table.rename({f"recall_pos{metric_suffix}": f"Recall{metric_suffix}"})
     class_score_table = (
         class_score_table.rename({"recall_total": "Total"})
@@ -83,7 +86,7 @@ def visualize(class_score_table: pl.DataFrame) -> None:
     import plotly.io as pio
 
     pio.kaleido.scope.mathjax = None
-    fig.write_image("recall_distribution.pdf")
+    fig.write_image(output_file)
     # fig.show()
 
 
