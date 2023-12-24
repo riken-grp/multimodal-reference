@@ -1,2 +1,2 @@
-name: default
+name: default-${detic_detection.name}
 prediction_dir: ./result/detic/${.name}
