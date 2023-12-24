@@ -31,8 +31,7 @@ class DeticObjectDetection(luigi.Task, FileBasedResourceManagerMixin[int]):
         cfg = self.cfg
         input_video_file = Path(cfg.recording_dir) / self.scenario_id / "fp_video.mp4"
 
-        gpu_id = self.acquire_resource()
-        if gpu_id is None:
+        if (gpu_id := self.acquire_resource()) is None:
             raise RuntimeError("No available GPU.")
         try:
             env = os.environ.copy()

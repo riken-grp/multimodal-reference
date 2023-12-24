@@ -28,12 +28,11 @@ class CohesionAnalysis(luigi.Task, FileBasedResourceManagerMixin[int]):
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.knp")
 
     def run(self):
-        gpu_id = self.acquire_resource()
-        if gpu_id is None:
-            raise RuntimeError("No available GPU.")
         cfg = self.cfg
         input_knp_file = Path(cfg.gold_knp_dir) / f"{self.scenario_id}.knp"
 
+        if (gpu_id := self.acquire_resource()) is None:
+            raise RuntimeError("No available GPU.")
         try:
             env = os.environ.copy()
             env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)

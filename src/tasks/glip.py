@@ -40,8 +40,7 @@ class GLIPPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
 
     def run(self):
-        gpu_id = self.acquire_resource()
-        if gpu_id is None:
+        if (gpu_id := self.acquire_resource()) is None:
             raise RuntimeError("No available GPU.")
         try:
             env = os.environ.copy()
