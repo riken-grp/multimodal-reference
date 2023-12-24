@@ -27,6 +27,21 @@ class MultipleObjectTracking(luigi.Task):
     def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
 
+    def complete(self) -> bool:
+        if not Path(self.output().path).exists():
+            return False
+
+        self_mtime = Path(self.output().path).stat().st_mtime
+        task = self.requires()
+        if not task.complete():
+            return False
+        output = task.output()
+        assert isinstance(output, luigi.LocalTarget), f"output is not LocalTarget: {output}"
+        if Path(output.path).stat().st_mtime > self_mtime:
+            return False
+
+        return True
+
     def run(self) -> None:
         cfg = self.cfg.mot
         input_video_file = Path(cfg.recording_dir) / self.scenario_id / "fp_video.mp4"
