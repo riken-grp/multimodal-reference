@@ -6,7 +6,7 @@ import luigi
 from omegaconf import DictConfig
 from rhoknp import Document
 
-from tasks.detic import DeticPhraseGrounding
+from tasks.detic_detection import DeticObjectDetection
 
 
 class MultipleObjectTracking(luigi.Task):
@@ -22,27 +22,21 @@ class MultipleObjectTracking(luigi.Task):
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def requires(self) -> luigi.Task:
-        return DeticPhraseGrounding(
-            scenario_id=self.scenario_id,
-            cfg=self.cfg.detic,
-            document=self.gold_document,
-            dataset_dir=self.dataset_dir,
-        )
+        return DeticObjectDetection(scenario_id=self.scenario_id, cfg=self.cfg.detic)
 
     def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
 
     def run(self) -> None:
         cfg = self.cfg.mot
+        input_video_file = Path(cfg.recording_dir) / self.scenario_id / "fp_video.mp4"
         subprocess.run(
             [
                 cfg.python,
                 f"{cfg.project_root}/src/mot_strong_sort.py",
-                f"{cfg.recording_dir}/{self.scenario_id}/fp_video.mp4",
-                "--detic-dump",
-                f"{cfg.detic_dump_dir}/{self.scenario_id}.npy",
-                "--output-json",
-                self.output().path,
+                input_video_file,
+                f"--detic-dump={self.input().path}",
+                f"--output-json={self.output().path}",
             ],
             check=True,
         )

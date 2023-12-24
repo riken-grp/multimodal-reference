@@ -1,5 +1,4 @@
 project_root: /path/to/project
 python: /path/to/python
 recording_dir: ./data/recording
-detic_dump_dir: ${detic.dump_dir}
 prediction_dir: ./result/mot

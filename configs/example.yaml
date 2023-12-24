@@ -1,6 +1,7 @@
 defaults:
   - base.yaml
   - cohesion: example.yaml
+  - detic_detection: default.yaml
   - mdetr: example.yaml
   - glip: example.yaml
   - detic: default.yaml
