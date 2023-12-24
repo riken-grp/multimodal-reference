@@ -1,1 +1,2 @@
+name: default
 prediction_dir: ./result/detic/${.name}
