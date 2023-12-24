@@ -20,7 +20,7 @@ class DeticObjectDetection(luigi.Task, FileBasedResourceManagerMixin[int]):
         super(luigi.Task, self).__init__(
             available_gpus, Path("shared_state.json"), state_prefix=f"{socket.gethostname()}_gpu"
         )
-        Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
+        Path(self.cfg.prediction_dir).mkdir(exist_ok=True, parents=True)
 
     def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(
