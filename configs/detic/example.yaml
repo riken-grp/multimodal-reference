@@ -1,2 +1,3 @@
 name: default-${detic_detection.name}
 prediction_dir: ./result/detic/${.name}
+detic_detection: ${detic_detection}

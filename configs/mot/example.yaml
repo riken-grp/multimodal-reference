@@ -3,3 +3,4 @@ python: /path/to/python
 name: default-${detic_detection.name}  # mot task depends on detic_detection task
 recording_dir: ./data/recording
 prediction_dir: ./result/mot/${.name}
+detic_detection: ${detic_detection}

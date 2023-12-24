@@ -4,7 +4,6 @@ from typing import Annotated
 
 import luigi
 from omegaconf import DictConfig
-from rhoknp import Document
 
 from tasks.detic_detection import DeticObjectDetection
 
@@ -15,14 +14,10 @@ class MultipleObjectTracking(luigi.Task):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.dataset_dir = Path(self.cfg.dataset_dir) / self.scenario_id
-        self.gold_document = Document.from_knp(
-            Path(self.cfg.gold_knp_dir).joinpath(f"{self.scenario_id}.knp").read_text()
-        )
-        Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
+        Path(self.cfg.prediction_dir).mkdir(exist_ok=True, parents=True)
 
     def requires(self) -> luigi.Task:
-        return DeticObjectDetection(scenario_id=self.scenario_id, cfg=self.cfg.detic)
+        return DeticObjectDetection(scenario_id=self.scenario_id, cfg=self.cfg.detic_detection)
 
     def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
@@ -43,7 +38,7 @@ class MultipleObjectTracking(luigi.Task):
         return True
 
     def run(self) -> None:
-        cfg = self.cfg.mot
+        cfg = self.cfg
         input_video_file = Path(cfg.recording_dir) / self.scenario_id / "fp_video.mp4"
         subprocess.run(
             [

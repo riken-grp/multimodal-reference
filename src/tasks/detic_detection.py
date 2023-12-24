@@ -23,7 +23,9 @@ class DeticObjectDetection(luigi.Task, FileBasedResourceManagerMixin[int]):
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def output(self) -> luigi.LocalTarget:
-        return luigi.LocalTarget(Path(self.cfg.prediction_dir).resolve() / f"{self.scenario_id}.npy")
+        return luigi.LocalTarget(
+            Path(self.cfg.prediction_dir).resolve() / f"{self.scenario_id}.npy", format=luigi.format.Nop
+        )
 
     def run(self):
         cfg = self.cfg

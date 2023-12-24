@@ -30,7 +30,7 @@ class DeticPhraseGrounding(luigi.Task):
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def requires(self) -> luigi.Task:
-        return DeticObjectDetection(scenario_id=self.scenario_id, cfg=self.cfg)
+        return DeticObjectDetection(scenario_id=self.scenario_id, cfg=self.cfg.detic_detection)
 
     def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
@@ -51,7 +51,7 @@ class DeticPhraseGrounding(luigi.Task):
         return True
 
     def run(self) -> None:
-        with self.input().open(mode="rb") as f:
+        with self.input().open(mode="r") as f:
             detection_dump: list[np.ndarray] = pickle.load(f)
 
         utterance_predictions: list[UtterancePrediction] = []
