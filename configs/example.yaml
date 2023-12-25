@@ -18,3 +18,18 @@ gold_annotation_dir: /path/to/gold/annotation
 phrase_grounding_model: glip  # mdetr, glip, detic
 coref_relax_mode: null  # null, pred, gold
 mot_relax_mode: null  # null, pred, gold
+
+names:
+  mdetr: mdetr_${mdetr.name}
+  glip: glip_${glip.name}
+  detic: detic_${detic.name}
+
+coref_relax_names:
+  pred: -coref_relax_pred
+  gold: -coref_relax_gold
+
+mot_relax_names:
+  pred: -mot_relax_${mot.name}
+  gold: -mot_relax_gold
+
+name: ${names[${phrase_grounding_model}]}${get:${coref_relax_names},${coref_relax_mode},}${get:${mot_relax_names},${mot_relax_mode},}

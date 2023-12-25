@@ -3,7 +3,7 @@ from pathlib import Path
 
 import hydra
 import luigi
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from tasks.mmref import MultimodalReference
 
@@ -11,6 +11,10 @@ warnings.filterwarnings(
     "ignore",
     message=r'Parameter "(cfg|document)" with value .+ is not of type string\.',
     category=UserWarning,
+)
+
+OmegaConf.register_new_resolver(
+    "get", lambda d, k, v: getattr(d, k, v) if k is not None else v, replace=True, use_cache=True
 )
 
 
