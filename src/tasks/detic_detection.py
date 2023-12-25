@@ -45,7 +45,7 @@ class DeticObjectDetection(luigi.Task, FileBasedResourceManagerMixin[int]):
                     f"--video-input={input_video_file.resolve()}",
                     "--vocabulary=lvis",
                     f"--confidence-threshold={cfg.confidence_threshold}",
-                    f"--output={self.output()}",
+                    f"--output={self.output().path}",
                     "--opts",
                     "MODEL.WEIGHTS",
                     cfg.model,
