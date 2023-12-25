@@ -57,9 +57,12 @@ def main():
         frame: np.ndarray  # (h, w, 3)
         if idx >= len(detic_dump):
             break
-        raw_bbs: np.ndarray = detic_dump[idx]  # (bb, 6)
+        raw_bbs: np.ndarray = detic_dump[idx]  # (bb, 6), the 2nd axis: (x1, y1, x2, y2, confidence, class_id)
         if len(raw_bbs.shape) != 2 or raw_bbs.shape[1] != 6:
             raw_bbs = np.empty((0, 6))
+        # filter out too small BBs
+        raw_bbs = raw_bbs[raw_bbs[:, 2] - raw_bbs[:, 0] >= 1]
+        raw_bbs = raw_bbs[raw_bbs[:, 3] - raw_bbs[:, 1] >= 1]
 
         tracked_bbs: np.ndarray = mot_tracker.update(raw_bbs, frame)  # (bb, 7)
 

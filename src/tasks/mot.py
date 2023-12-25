@@ -58,7 +58,7 @@ class MultipleObjectTracking(luigi.Task, FileBasedResourceManagerMixin[int]):
                 [
                     cfg.python,
                     f"{cfg.project_root}/src/mot_strong_sort.py",
-                    input_video_file,
+                    str(input_video_file),
                     f"--detic-dump={self.input().path}",
                     f"--output-json={self.output().path}",
                 ],
