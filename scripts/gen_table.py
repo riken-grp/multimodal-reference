@@ -18,19 +18,12 @@ class ExpConfig:
     mot_relax_mode: Optional[str]  # None, "pred", or "gold"
 
     def get_name(self) -> str:
-        return "-".join(
-            [
-                f"{self.phrase_grounding_model}_{self.model_name}",
-                f"coref_{self.coref_relax_mode}",
-                f"mot_{self.mot_relax_mode}",
-            ]
-        )
-
-
-@dataclass(frozen=True)
-class EvaluationConfig:
-    id_file: Path
-    # recall_topk: int
+        items = [f"{self.phrase_grounding_model}_{self.model_name}"]
+        if self.coref_relax_mode is not None:
+            items.append(f"coref_relax_{self.coref_relax_mode}")
+        if self.mot_relax_mode is not None:
+            items.append(f"mot_relax_{self.mot_relax_mode}")
+        return "-".join(items)
 
 
 @dataclass(frozen=True)
@@ -51,9 +44,9 @@ def gen_relax_comparison_profile(phrase_grounding_model: str, model_name: str) -
         (None, None),
         ("pred", None),
         ("gold", None),
-        (None, "pred"),
+        (None, "default-th0.3"),
         (None, "gold"),
-        ("pred", "pred"),
+        ("pred", "default-th0.3"),
         ("gold", "gold"),
     ]
     for coref_relax_mode, mot_relax_mode in relax_modes:
@@ -75,12 +68,12 @@ def main():
     parser.add_argument(
         "--recall-topk", "--topk", type=int, nargs="*", default=[1, 5, 10], help="For calculating Recall@k."
     )
-    args = parser.parse_args()
-    eval_config = EvaluationConfig(
-        id_file=Path("data/id/test.id"),
+    parser.add_argument(
+        "--id-file", type=Path, nargs="+", default=[Path("data/id/test.id")], help="Paths to scenario id file"
     )
-    scenario_ids: list[str] = eval_config.id_file.read_text().splitlines()
-    exp_configs = gen_relax_comparison_profile("glip", "ft2_mixed_0.5e")
+    args = parser.parse_args()
+    scenario_ids: list[str] = sum((path.read_text().splitlines() for path in args.id_file), [])
+    exp_configs = gen_relax_comparison_profile("glip", "ft2_mixed_0.5e_win2")
     data: dict[ExpConfig, list[str]] = {config: [] for config in exp_configs}
     for exp_config in exp_configs:
         exp_name = exp_config.get_name()
@@ -93,7 +86,7 @@ def main():
                 f" -a data/image_text_annotation"
                 f" -p result/mmref/{exp_name}"
                 f" --prediction-knp-dir result/cohesion"
-                f" --prediction-mot-dir result/mot"
+                # f" --prediction-mot-dir result/mot/default-th0.3"
                 f" --scenario-ids {' '.join(scenario_ids)}"
                 f" --recall-topk {' '.join(map(str, args.recall_topk))}"
                 f" --th 0.0"
