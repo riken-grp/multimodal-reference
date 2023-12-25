@@ -68,19 +68,17 @@ class MMRefEvaluator:
             for gold_bounding_box in image_annotation.bounding_boxes:
                 if gold_bounding_box.class_name == "region":
                     continue
-                # key identifies each gold bounding box
+                # `key` identifies each gold bounding box
                 key: tuple[str, ...] = (
                     self.dataset_info.scenario_id,
                     image_annotation.image_id,
                     gold_bounding_box.instance_id,
                     gold_bounding_box.class_name,
                 )
-                gold_rect: Rectangle = gold_bounding_box.rect
-                rects: list[tuple] = []
-                for pred_bounding_box in predicted_bounding_boxes:
-                    is_tp = box_iou(gold_rect, pred_bounding_box.rect) >= self.iou_threshold
-                    rects.append((pred_bounding_box.confidence, is_tp))
-                recall_predictions[key] = rects
+                recall_predictions[key] = [
+                    (pred_bounding_box.confidence, box_iou(gold_bounding_box.rect, pred_bounding_box.rect))
+                    for pred_bounding_box in predicted_bounding_boxes
+                ]
 
         results: list[dict[str, Any]] = []
         for key, orig_preds in recall_predictions.items():
@@ -90,7 +88,7 @@ class MMRefEvaluator:
             recall_pos_dict = {}
             for recall_top_k in recall_top_ks:
                 top_k_comps = comps[:recall_top_k] if recall_top_k >= 0 else comps
-                recall_pos = int(any(comp[1] for comp in top_k_comps))  # 0 if comps is empty
+                recall_pos = int(any(comp[1] >= self.iou_threshold for comp in top_k_comps))  # 0 if comps is empty
                 recall_pos_dict[f"recall_pos@{recall_top_k}" if recall_top_k >= 0 else "recall_pos"] = recall_pos
             results.append(
                 {
@@ -144,7 +142,7 @@ class MMRefEvaluator:
                 rects = [rect for rect in rects if rect[0] >= confidence_threshold]
             for recall_top_k in recall_top_ks:
                 top_k_rects = rects[:recall_top_k] if recall_top_k >= 0 else rects
-                recall_pos = int(any(rect[1] for rect in top_k_rects))  # 0 if rects is empty
+                recall_pos = int(any(rect[1] >= self.iou_threshold for rect in top_k_rects))  # 0 if rects is empty
                 result_dict[key][f"recall_pos@{recall_top_k}"] = recall_pos
             result_dict[key]["recall_total"] = 1
 
@@ -155,7 +153,9 @@ class MMRefEvaluator:
             # old way of calculating precision
             # precision_pos += sum(rect[1] for rect in rects)
             # precision_total += max(1, sum(rect[1] for rect in rects))
-            result_dict[key]["precision_pos"] = int(any(rect[1] for rect in rects))  # 0 if rects is empty
+            result_dict[key]["precision_pos"] = int(
+                any(rect[1] >= self.iou_threshold for rect in rects)
+            )  # 0 if rects is empty
             result_dict[key]["precision_total"] = 1
 
         results: list[dict[str, Any]] = []
@@ -191,8 +191,8 @@ class MMRefEvaluator:
         prediction: PhraseGroundingPrediction,
         image_span: Literal["past", "current", "all"] = "current",
     ) -> tuple[dict, dict]:
-        recall_rects: dict[tuple[Any, ...], list[tuple[float, bool]]] = {}
-        precision_rects: dict[tuple[Any, ...], list[tuple[float, bool]]] = {}
+        recall_rects: dict[tuple[Any, ...], list[tuple[float, float]]] = {}
+        precision_rects: dict[tuple[Any, ...], list[tuple[float, float]]] = {}
 
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
@@ -259,12 +259,10 @@ class MMRefEvaluator:
                         key=lambda bb: bb.confidence,
                         reverse=True,
                     )
-                    gold_box: Rectangle = gold_bounding_box.rect
-                    rects: list[tuple[float, bool]] = []
-                    for pred_bounding_box in pred_bounding_boxes:
-                        is_tp = box_iou(gold_box, pred_bounding_box.rect) >= self.iou_threshold
-                        rects.append((pred_bounding_box.confidence, is_tp))
-                    recall_rects[key] = rects
+                    recall_rects[key] = [
+                        (pred_bounding_box.confidence, box_iou(gold_bounding_box.rect, pred_bounding_box.rect))
+                        for pred_bounding_box in pred_bounding_boxes
+                    ]
 
                 # precision
                 for rel_idx, pred_relation in enumerate(pred_relations):
@@ -273,7 +271,7 @@ class MMRefEvaluator:
                     gold_relations = [
                         rel for rel in phrase_annotation.relations if rel.type in (relation_type, relation_type + "≒")
                     ]
-                    pred_box: Rectangle = pred_relation.bounding_box.rect
+                    pred_rect: Rectangle = pred_relation.bounding_box.rect
                     gold_bounding_boxes = [
                         instance_id_to_bounding_box[rel.instance_id]
                         for rel in gold_relations
@@ -290,18 +288,18 @@ class MMRefEvaluator:
                         relation_type,
                         str(rel_idx),
                         "",
-                        pred_box.w,
-                        pred_box.h,
-                        pred_box.cx,
-                        pred_box.cy,
+                        pred_rect.w,
+                        pred_rect.h,
+                        pred_rect.cx,
+                        pred_rect.cy,
                     )
-                    rects = []
-                    for gold_bounding_box in gold_bounding_boxes:
-                        is_tp = box_iou(gold_bounding_box.rect, pred_box) >= self.iou_threshold
-                        rects.append((pred_relation.bounding_box.confidence, is_tp))
+                    rects = [
+                        (pred_relation.bounding_box.confidence, box_iou(gold_bounding_box.rect, pred_rect))
+                        for gold_bounding_box in gold_bounding_boxes
+                    ]
                     if not rects:
-                        # ensure at least one rect to store confidence
-                        rects.append((pred_relation.bounding_box.confidence, False))
+                        # Ensure at least one rect to store confidence
+                        rects.append((pred_relation.bounding_box.confidence, -1.0))
                     precision_rects[key] = rects
 
         return recall_rects, precision_rects
