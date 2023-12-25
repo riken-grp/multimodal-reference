@@ -56,7 +56,7 @@ class MMRefEvaluator:
         recall_predictions: dict[tuple[str, ...], list] = {}
         for image_annotation in self.image_annotations:
             image_idx = int(image_annotation.image_id) - 1
-            raw_bbs: np.ndarray = pred_detection[image_idx]
+            raw_bbs: np.ndarray = pred_detection[image_idx * 30]
             predicted_bounding_boxes = [
                 BoundingBoxPrediction(
                     image_id=image_annotation.image_id,
