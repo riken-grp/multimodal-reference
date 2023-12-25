@@ -324,7 +324,9 @@ def parse_args():
         default="data/image_text_annotation",
         help="Path to the gold image text annotation file.",
     )
-    parser.add_argument("--prediction-dir", "-p", type=Path, required=True, help="Path to the prediction directory.")
+    parser.add_argument(
+        "--prediction-mmref-dir", "-p", type=Path, default="result/mmref", help="Path to the prediction directory."
+    )
     parser.add_argument(
         "--prediction-knp-dir", type=Path, default="result/cohesion", help="Path to the prediction directory."
     )
@@ -408,22 +410,21 @@ def main():
         )
         print(df_to_string(pl.from_pandas(summary.tail(1)), args.format))
 
-    if "rel" not in args.eval_modes and "class" not in args.eval_modes and "detection" not in args.eval_modes:
-        return
+    if "rel" in args.eval_modes or "class" in args.eval_modes:
+        mmref_result_df = pl.DataFrame(eval_results["mmref"])
+        if args.raw_result_csv is not None:
+            mmref_result_df.write_csv(args.raw_result_csv)
 
-    mmref_result_df = pl.DataFrame(eval_results["mmref"])
-    if args.raw_result_csv is not None:
-        mmref_result_df.write_csv(args.raw_result_csv)
+        if "rel" in args.eval_modes:
+            print_relation_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
-    if "rel" in args.eval_modes:
-        print_relation_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
-
-    if "class" in args.eval_modes:
-        print_class_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
+        if "class" in args.eval_modes:
+            print_class_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "detection" in args.eval_modes:
         detection_result_df = pl.DataFrame(eval_results["detection"])
-        detection_result_df.write_csv("detection_result.csv")
+        if args.raw_result_csv is not None:
+            detection_result_df.write_csv(args.raw_result_csv)
         detection_result_df = detection_result_df.sum().drop("scenario_id", "image_id", "instance_id", "class_name")
         new_columns = []
         for recall_top_k in args.recall_topk:
