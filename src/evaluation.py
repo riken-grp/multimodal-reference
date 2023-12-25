@@ -11,11 +11,9 @@ from typing import Any, Literal, Optional
 import motmetrics
 import numpy as np
 import polars as pl
-import torch
 from cohesion_tools.evaluators import CohesionEvaluator, CohesionScore
 from rhoknp import Document
 from rhoknp.cohesion import ExophoraReferent
-from torchmetrics.detection import MeanAveragePrecision
 
 from utils.annotation import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.constants import CASES, RELATION_TYPES_ALL
@@ -49,9 +47,13 @@ class MMRefEvaluator:
             gold_documents=[self.gold_document],
         )
 
-    def eval_object_detection(self, pred_detection: np.ndarray) -> tuple[list, list]:
-        preds = []
-        target = []
+    def eval_object_detection(
+        self,
+        pred_detection: np.ndarray,
+        recall_top_ks: list[int],
+        confidence_threshold: float = 0.0,
+    ) -> list[dict[str, Any]]:
+        recall_predictions: dict[tuple[str, ...], list] = {}
         for image_annotation in self.image_annotations:
             image_idx = int(image_annotation.image_id) - 1
             raw_bbs: np.ndarray = pred_detection[image_idx]
@@ -63,21 +65,45 @@ class MMRefEvaluator:
                 )
                 for raw_bb in raw_bbs.tolist()
             ]
-            gold_bounding_boxes = image_annotation.bounding_boxes
-            preds.append(
-                dict(
-                    boxes=torch.as_tensor([bb.rect.to_xyxy() for bb in predicted_bounding_boxes]),
-                    scores=torch.as_tensor([bb.confidence for bb in predicted_bounding_boxes]),
-                    labels=torch.as_tensor([0 for _ in predicted_bounding_boxes]),
+            for gold_bounding_box in image_annotation.bounding_boxes:
+                if gold_bounding_box.class_name == "region":
+                    continue
+                # key identifies each gold bounding box
+                key: tuple[str, ...] = (
+                    self.dataset_info.scenario_id,
+                    image_annotation.image_id,
+                    gold_bounding_box.instance_id,
+                    gold_bounding_box.class_name,
                 )
+                gold_rect: Rectangle = gold_bounding_box.rect
+                rects: list[tuple] = []
+                for pred_bounding_box in predicted_bounding_boxes:
+                    is_tp = box_iou(gold_rect, pred_bounding_box.rect) >= self.iou_threshold
+                    rects.append((pred_bounding_box.confidence, is_tp))
+                recall_predictions[key] = rects
+
+        results: list[dict[str, Any]] = []
+        for key, orig_preds in recall_predictions.items():
+            comps: list[tuple[float, bool]] = sorted(orig_preds, key=lambda x: x[0], reverse=True)
+            if confidence_threshold >= 0:
+                comps = [comp for comp in comps if comp[0] >= confidence_threshold]
+            recall_pos_dict = {}
+            for recall_top_k in recall_top_ks:
+                top_k_comps = comps[:recall_top_k] if recall_top_k >= 0 else comps
+                recall_pos = int(any(comp[1] for comp in top_k_comps))  # 0 if comps is empty
+                recall_pos_dict[f"recall_pos@{recall_top_k}" if recall_top_k >= 0 else "recall_pos"] = recall_pos
+            results.append(
+                {
+                    "scenario_id": key[0],
+                    "image_id": key[1],
+                    "instance_id": key[2],
+                    "class_name": key[3],
+                    "recall_total": 1,
+                }
+                | recall_pos_dict
             )
-            target.append(
-                dict(
-                    boxes=torch.as_tensor([bb.rect.to_xyxy() for bb in gold_bounding_boxes]),
-                    labels=torch.as_tensor([0 for _ in gold_bounding_boxes]),
-                )
-            )
-        return preds, target
+
+        return results
 
     def eval_mot(self, pred_mot: DetectionLabels) -> motmetrics.MOTAccumulator:
         accumulator = motmetrics.MOTAccumulator(auto_id=True)  # `auto_id=True`: Automatically increment frame id
@@ -165,8 +191,8 @@ class MMRefEvaluator:
         prediction: PhraseGroundingPrediction,
         image_span: Literal["past", "current", "all"] = "current",
     ) -> tuple[dict, dict]:
-        recall_rects: dict[tuple, list[tuple[float, bool]]] = {}
-        precision_rects: dict[tuple, list[tuple[float, bool]]] = {}
+        recall_rects: dict[tuple[Any, ...], list[tuple[float, bool]]] = {}
+        precision_rects: dict[tuple[Any, ...], list[tuple[float, bool]]] = {}
 
         # utterance ごとに評価
         sid2sentence = {sentence.sid: sentence for sentence in self.gold_document.sentences}
@@ -234,7 +260,7 @@ class MMRefEvaluator:
                         reverse=True,
                     )
                     gold_box: Rectangle = gold_bounding_box.rect
-                    rects: list[tuple] = []
+                    rects: list[tuple[float, bool]] = []
                     for pred_bounding_box in pred_bounding_boxes:
                         is_tp = box_iou(gold_box, pred_bounding_box.rect) >= self.iou_threshold
                         rects.append((pred_bounding_box.confidence, is_tp))
@@ -356,9 +382,9 @@ def main():
         if "detection" in args.eval_modes:
             with args.prediction_detection_dir.joinpath(f"{scenario_id}.npy").open(mode="rb") as f:
                 pred_detection: np.ndarray = pickle.load(f)
-            preds, target = evaluator.eval_object_detection(pred_detection)
-            eval_results["detection_preds"] += preds
-            eval_results["detection_target"] += target
+            eval_results["detection"] += evaluator.eval_object_detection(
+                pred_detection, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
+            )
         if "rel" in args.eval_modes or "class" in args.eval_modes:
             prediction = PhraseGroundingPrediction.from_json(
                 args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
@@ -396,12 +422,19 @@ def main():
         print_class_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "detection" in args.eval_modes:
-        metric = MeanAveragePrecision(
-            box_format="xyxy", iou_type="bbox", class_metrics=False, max_detection_thresholds=[10, 100, 1000]
-        )
-        metric.update(preds=eval_results["detection_preds"], target=eval_results["detection_target"])
-        pl.Config.set_tbl_cols(16)
-        print(repr(pl.DataFrame(metric.compute())))
+        detection_result_df = pl.DataFrame(eval_results["detection"])
+        detection_result_df.write_csv("detection_result.csv")
+        detection_result_df = detection_result_df.sum().drop("scenario_id", "image_id", "instance_id", "class_name")
+        new_columns = []
+        for recall_top_k in args.recall_topk:
+            metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
+            new_columns.append(
+                (detection_result_df["recall_pos" + metric_suffix] / detection_result_df["recall_total"]).alias(
+                    "recall" + metric_suffix
+                )
+            )
+        detection_result_df = detection_result_df.with_columns(new_columns)
+        print(df_to_string(detection_result_df, args.format))
 
 
 def print_relation_table(
