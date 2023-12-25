@@ -387,7 +387,7 @@ def main():
             )
         if "rel" in args.eval_modes or "class" in args.eval_modes:
             prediction = PhraseGroundingPrediction.from_json(
-                args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
+                args.prediction_mmref_dir.joinpath(f"{scenario_id}.json").read_text()
             )
             eval_results["mmref"] += evaluator.eval_visual_reference(
                 prediction, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
