@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import math
+import pickle
 from collections import defaultdict
 from functools import reduce
 from operator import add
@@ -8,10 +9,13 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 import motmetrics
+import numpy as np
 import polars as pl
+import torch
 from cohesion_tools.evaluators import CohesionEvaluator, CohesionScore
 from rhoknp import Document
 from rhoknp.cohesion import ExophoraReferent
+from torchmetrics.detection import MeanAveragePrecision
 
 from utils.annotation import BoundingBox, ImageAnnotation, ImageTextAnnotation
 from utils.constants import CASES, RELATION_TYPES_ALL
@@ -44,6 +48,36 @@ class MMRefEvaluator:
             predicted_documents=[pred_document],
             gold_documents=[self.gold_document],
         )
+
+    def eval_object_detection(self, pred_detection: np.ndarray) -> tuple[list, list]:
+        preds = []
+        target = []
+        for image_annotation in self.image_annotations:
+            image_idx = int(image_annotation.image_id) - 1
+            raw_bbs: np.ndarray = pred_detection[image_idx]
+            predicted_bounding_boxes = [
+                BoundingBoxPrediction(
+                    image_id=image_annotation.image_id,
+                    rect=Rectangle(x1=raw_bb[0] / 2, y1=raw_bb[1] / 2, x2=raw_bb[2] / 2, y2=raw_bb[3] / 2),
+                    confidence=raw_bb[4],
+                )
+                for raw_bb in raw_bbs.tolist()
+            ]
+            gold_bounding_boxes = image_annotation.bounding_boxes
+            preds.append(
+                dict(
+                    boxes=torch.as_tensor([bb.rect.to_xyxy() for bb in predicted_bounding_boxes]),
+                    scores=torch.as_tensor([bb.confidence for bb in predicted_bounding_boxes]),
+                    labels=torch.as_tensor([0 for _ in predicted_bounding_boxes]),
+                )
+            )
+            target.append(
+                dict(
+                    boxes=torch.as_tensor([bb.rect.to_xyxy() for bb in gold_bounding_boxes]),
+                    labels=torch.as_tensor([0 for _ in gold_bounding_boxes]),
+                )
+            )
+        return preds, target
 
     def eval_mot(self, pred_mot: DetectionLabels) -> motmetrics.MOTAccumulator:
         accumulator = motmetrics.MOTAccumulator(auto_id=True)  # `auto_id=True`: Automatically increment frame id
@@ -272,7 +306,10 @@ def parse_args():
         "--prediction-mot-dir", type=Path, default="result/mot", help="Path to the prediction directory."
     )
     parser.add_argument(
-        "--prediction-detection-dir", type=Path, default="result/detic/th0.5", help="Path to the prediction directory."
+        "--prediction-detection-dir",
+        type=Path,
+        default="result/detection/th0.5",
+        help="Path to the prediction directory.",
     )
     parser.add_argument("--scenario-ids", "--ids", type=str, nargs="*", required=True, help="List of scenario ids.")
     parser.add_argument("--recall-topk", "--topk", type=int, nargs="*", default=[], help="For calculating Recall@k.")
@@ -317,16 +354,12 @@ def main():
             pred_mot = DetectionLabels.from_json(args.prediction_mot_dir.joinpath(f"{scenario_id}.json").read_text())
             eval_results["mot"].append(evaluator.eval_mot(pred_mot))
         if "detection" in args.eval_modes:
-            pred_detection = PhraseGroundingPrediction.from_json(
-                args.prediction_detection_dir.joinpath(f"{scenario_id}.json").read_text()
-            )
-            eval_results["detection"] += evaluator.eval_visual_reference(
-                pred_detection,
-                recall_top_ks=args.recall_topk,
-                confidence_threshold=args.confidence_threshold,
-                image_span="all",
-            )
-        if "rel" in args.eval_modes or "class" in args.eval_modes or "detection" in args.eval_modes:
+            with args.prediction_detection_dir.joinpath(f"{scenario_id}.npy").open(mode="rb") as f:
+                pred_detection: np.ndarray = pickle.load(f)
+            preds, target = evaluator.eval_object_detection(pred_detection)
+            eval_results["detection_preds"] += preds
+            eval_results["detection_target"] += target
+        if "rel" in args.eval_modes or "class" in args.eval_modes:
             prediction = PhraseGroundingPrediction.from_json(
                 args.prediction_dir.joinpath(f"{scenario_id}.json").read_text()
             )
@@ -363,43 +396,12 @@ def main():
         print_class_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "detection" in args.eval_modes:
-        mmref_result_df = pl.DataFrame(eval_results["detection"])
-        grouped_df = mmref_result_df.group_by(["scenario_id", "image_id", "instance_id_or_pred_idx"])
-        decimated_dfs = []
-        for _, specific_utterance_df in grouped_df:
-            specific_sentence_df = specific_utterance_df.filter(pl.col("sid") == specific_utterance_df["sid"][0])
-            specific_phrase_df = specific_sentence_df.filter(
-                pl.col("base_phrase_index") == specific_sentence_df["base_phrase_index"][0]
-            )
-            decimated_dfs.append(specific_phrase_df)
-
-        df_detection = pl.concat(decimated_dfs, how="vertical")
-        # df_detection = df_detection.filter(pl.col("image_id") == "015")  # debug
-        # df_detection.write_csv("debug.csv")
-        df_detection: pl.DataFrame = df_detection.sum().drop(
-            [
-                "scenario_id",
-                "image_id",
-                "utterance_id",
-                "sid",
-                "base_phrase_index",
-                "instance_id_or_pred_idx",
-                "class_name",
-                "precision_pos",
-                "precision_total",
-            ]
+        metric = MeanAveragePrecision(
+            box_format="xyxy", iou_type="bbox", class_metrics=False, max_detection_thresholds=[10, 100, 1000]
         )
-
-        new_columns = []
-        for recall_top_k in args.recall_topk:
-            metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
-            new_columns.append(
-                (df_detection["recall_pos" + metric_suffix] / df_detection["recall_total"]).alias(
-                    "recall" + metric_suffix
-                )
-            )
-        df_detection = df_detection.with_columns(new_columns)
-        print(df_to_string(df_detection, args.format, args.column_prefixes))
+        metric.update(preds=eval_results["detection_preds"], target=eval_results["detection_target"])
+        pl.Config.set_tbl_cols(16)
+        print(repr(pl.DataFrame(metric.compute())))
 
 
 def print_relation_table(
