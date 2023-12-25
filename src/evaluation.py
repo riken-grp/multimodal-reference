@@ -305,7 +305,7 @@ class MMRefEvaluator:
         return recall_rects, precision_rects
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--dataset-dir",
@@ -362,7 +362,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     args = parse_args()
     eval_results: dict[str, list[Any]] = defaultdict(list)
     for scenario_id in args.scenario_ids:
@@ -479,7 +479,7 @@ def print_class_table(
     recall_top_ks: list[int],
     column_prefixes: list[str],
     format_: str = "repr",
-):
+) -> None:
     df_class = (
         mmref_result_df.filter(pl.col("rel_type") == "=")
         .group_by("class_name", maintain_order=True)
