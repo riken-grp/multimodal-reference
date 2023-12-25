@@ -38,9 +38,7 @@ class MultimodalReference(luigi.Task):
         super().__init__(*args, **kwargs)
         self.dataset_dir = Path(self.cfg.dataset_dir) / self.scenario_id
         self.exp_dir = Path(self.cfg.exp_dir)
-        self.gold_document = Document.from_knp(
-            Path(self.cfg.gold_knp_dir).joinpath(f"{self.scenario_id}.knp").read_text()
-        )
+        self.gold_document_path = Path(self.cfg.gold_knp_dir) / f"{self.scenario_id}.knp"
 
     def requires(self) -> dict[str, luigi.Task]:
         tasks: dict[str, luigi.Task] = {
@@ -48,7 +46,7 @@ class MultimodalReference(luigi.Task):
             "grounding": PHRASE_GROUNDING_MODEL_MAP[self.cfg.phrase_grounding_model](
                 cfg=getattr(self.cfg, self.cfg.phrase_grounding_model),
                 scenario_id=self.scenario_id,
-                document=self.gold_document,
+                document_path=self.gold_document_path,
                 dataset_dir=self.dataset_dir,
             ),
         }
@@ -75,6 +73,7 @@ class MultimodalReference(luigi.Task):
         return True
 
     def run(self):
+        gold_document = Document.from_knp(self.gold_document_path.read_text())
         with self.input()["cohesion"].open(mode="r") as f:
             cohesion_prediction = Document.from_knp(f.read())
         with self.input()["grounding"].open(mode="r") as f:
@@ -91,7 +90,7 @@ class MultimodalReference(luigi.Task):
             cohesion_prediction=cohesion_prediction,
             phrase_grounding_prediction=phrase_grounding_prediction,
             mot_prediction=mot_prediction,
-            gold_document=self.gold_document,
+            gold_document=gold_document,
             image_annotations=gold_annotation.images,
         )
         with self.output().open(mode="w") as f:

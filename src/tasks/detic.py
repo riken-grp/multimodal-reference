@@ -22,7 +22,7 @@ from utils.util import DatasetInfo, Rectangle
 class DeticPhraseGrounding(luigi.Task):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
     cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
-    document: Annotated[Document, luigi.Parameter()] = luigi.Parameter()
+    document_path: Annotated[Path, luigi.Parameter()] = luigi.PathParameter()
     dataset_dir: Annotated[Path, luigi.PathParameter()] = luigi.PathParameter()
 
     def __init__(self, *args, **kwargs) -> None:
@@ -55,8 +55,9 @@ class DeticPhraseGrounding(luigi.Task):
             detection_dump: list[np.ndarray] = pickle.load(f)
 
         utterance_predictions: list[UtterancePrediction] = []
+        document = Document.from_knp(self.document_path.read_text())
         dataset_info = DatasetInfo.from_json(self.dataset_dir.joinpath("info.json").read_text())
-        sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in self.document.sentences}
+        sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in document.sentences}
         for idx, utterance in enumerate(dataset_info.utterances):
             start_index = math.ceil(utterance.start / 1000)
             if idx + 1 < len(dataset_info.utterances):

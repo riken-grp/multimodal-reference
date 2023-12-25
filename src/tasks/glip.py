@@ -25,7 +25,7 @@ from utils.util import DatasetInfo
 class GLIPPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
     cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
-    document: Annotated[Document, luigi.Parameter()] = luigi.Parameter()
+    document_path: Annotated[Path, luigi.Parameter()] = luigi.PathParameter()
     dataset_dir: Annotated[Path, luigi.PathParameter()] = luigi.PathParameter()
 
     def __init__(self, *args, **kwargs) -> None:
@@ -48,7 +48,7 @@ class GLIPPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
             prediction = run_glip(
                 self.cfg,
                 dataset_dir=self.dataset_dir,
-                document=self.document,
+                document=Document.from_knp(self.document_path.read_text()),
                 env=env,
             )
             with self.output().open(mode="w") as f:

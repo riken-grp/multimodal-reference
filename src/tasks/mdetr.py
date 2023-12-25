@@ -23,7 +23,7 @@ from utils.util import DatasetInfo
 class MDETRPhraseGrounding(luigi.Task):
     scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
     cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
-    document: Annotated[Document, luigi.Parameter()] = luigi.Parameter()
+    document_path: Annotated[Path, luigi.Parameter()] = luigi.PathParameter()
     dataset_dir: Annotated[Path, luigi.PathParameter()] = luigi.PathParameter()
 
     def __init__(self, *args, **kwargs) -> None:
@@ -37,7 +37,7 @@ class MDETRPhraseGrounding(luigi.Task):
         prediction = run_mdetr(
             self.cfg,
             dataset_dir=self.dataset_dir,
-            document=self.document,
+            document=Document.from_knp(self.document_path.read_text()),
         )
         with self.output().open(mode="w") as f:
             f.write(prediction.to_json(ensure_ascii=False, indent=2))
