@@ -32,4 +32,4 @@ mot_relax_names:
   pred: -mot_relax_${mot.name}
   gold: -mot_relax_gold
 
-name: ${names[${phrase_grounding_model}]}${get:${coref_relax_names},${coref_relax_mode},}${get:${mot_relax_names},${mot_relax_mode},}
+name: ${names[${phrase_grounding_model}]}${get:${coref_relax_names},${coref_relax_mode},""}${get:${mot_relax_names},${mot_relax_mode},""}
