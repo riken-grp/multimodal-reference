@@ -72,17 +72,6 @@ def main():
             # confidence は detection の confidence そのまま
             x1, y1, x2, y2, instance_id, confidence, class_id, _ = tracked_bb.tolist()
             x1, y1, x2, y2, class_id, instance_id = int(x1), int(y1), int(x2), int(y2), int(class_id), int(instance_id)
-            color: list[int] = colors[class_id].tolist()
-            cv2.rectangle(frame, pt1=(x1, y1), pt2=(x2, y2), color=color, thickness=5)
-            cv2.putText(
-                frame,
-                f"{class_names[class_id]}_{instance_id}",
-                (x1, y1),
-                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale=5,
-                thickness=5,
-                color=(255, 255, 255),
-            )
             bounding_boxes.append(
                 BoundingBox(
                     rect=Rectangle(x1, y1, x2, y2),
@@ -93,6 +82,19 @@ def main():
             )
 
         if args.show:
+            for bounding_box in bounding_boxes:
+                rect = bounding_box.rect
+                color: list[int] = colors[class_names.index(bounding_box.class_name)].tolist()
+                cv2.rectangle(frame, pt1=(rect.x1, rect.y1), pt2=(rect.x2, rect.y2), color=color, thickness=5)
+                cv2.putText(
+                    frame,
+                    f"{bounding_box.class_name}_{bounding_box.instance_id}",
+                    (rect.x1, rect.y1),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=5,
+                    thickness=5,
+                    color=(255, 255, 255),
+                )
             cv2.imshow("img", frame)
         key = cv2.waitKey(1)
         if key == ord("q"):
