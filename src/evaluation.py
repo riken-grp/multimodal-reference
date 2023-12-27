@@ -53,7 +53,8 @@ class MMRefEvaluator:
         recall_top_ks: list[int],
         confidence_threshold: float = 0.0,
     ) -> list[dict[str, Any]]:
-        recall_predictions: dict[tuple[str, ...], list] = {}
+        recall_predictions: dict[tuple, list] = {}
+        precision_predictions: dict[tuple, list] = {}
         for image_annotation in self.image_annotations:
             image_idx = int(image_annotation.image_id) - 1
             raw_bbs: np.ndarray = pred_detection[image_idx * 30]
@@ -65,19 +66,39 @@ class MMRefEvaluator:
                 )
                 for raw_bb in raw_bbs.tolist()
             ]
+            # Recall
             for gold_bounding_box in image_annotation.bounding_boxes:
                 if gold_bounding_box.class_name == "region":
                     continue
                 # `key` identifies each gold bounding box
-                key: tuple[str, ...] = (
+                key: tuple = (
                     self.dataset_info.scenario_id,
                     image_annotation.image_id,
                     gold_bounding_box.instance_id,
+                    -1,
                     gold_bounding_box.class_name,
+                    -1,
                 )
                 recall_predictions[key] = [
                     (pred_bounding_box.confidence, box_iou(gold_bounding_box.rect, pred_bounding_box.rect))
                     for pred_bounding_box in predicted_bounding_boxes
+                ]
+
+            # Precision
+            for pred_idx, pred_bounding_box in enumerate(predicted_bounding_boxes):
+                # `key` identifies each predicted bounding box
+                key = (
+                    self.dataset_info.scenario_id,
+                    image_annotation.image_id,
+                    "",
+                    pred_idx,
+                    "",
+                    pred_bounding_box.confidence,
+                )
+                precision_predictions[key] = [
+                    box_iou(gold_bounding_box.rect, pred_bounding_box.rect)
+                    for gold_bounding_box in image_annotation.bounding_boxes
+                    if gold_bounding_box.class_name != "region"
                 ]
 
         results: list[dict[str, Any]] = []
@@ -95,8 +116,30 @@ class MMRefEvaluator:
                     "scenario_id": key[0],
                     "image_id": key[1],
                     "instance_id": key[2],
-                    "class_name": key[3],
+                    "pred_idx": key[3],
+                    "class_name": key[4],
+                    "precision_pos": 0,
+                    "precision_total": 0,
                     "recall_total": 1,
+                }
+                | recall_pos_dict
+            )
+
+        for key, ious in precision_predictions.items():
+            confidence: float = key[5]
+            if confidence < confidence_threshold:
+                continue
+            recall_pos_dict = {f"recall_pos@{recall_top_k}": 0 for recall_top_k in recall_top_ks}
+            results.append(
+                {
+                    "scenario_id": key[0],
+                    "image_id": key[1],
+                    "instance_id": key[2],
+                    "pred_idx": key[3],
+                    "class_name": key[4],
+                    "precision_pos": int(any(iou >= self.iou_threshold for iou in ious)),
+                    "precision_total": 1,
+                    "recall_total": 0,
                 }
                 | recall_pos_dict
             )
@@ -423,8 +466,13 @@ def main() -> None:
         detection_result_df = pl.DataFrame(eval_results["detection"])
         if args.raw_result_csv is not None:
             detection_result_df.write_csv(args.raw_result_csv)
-        detection_result_df = detection_result_df.sum().drop("scenario_id", "image_id", "instance_id", "class_name")
-        new_columns = []
+        num_images = detection_result_df.group_by("scenario_id", "image_id").count().shape[0]
+        detection_result_df = detection_result_df.sum().drop(
+            "scenario_id", "image_id", "instance_id", "pred_idx", "class_name"
+        )
+        new_columns = [
+            (detection_result_df["precision_pos"] / detection_result_df["precision_total"]).alias("precision")
+        ]
         for recall_top_k in args.recall_topk:
             metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
             new_columns.append(
@@ -432,7 +480,7 @@ def main() -> None:
                     "recall" + metric_suffix
                 )
             )
-        detection_result_df = detection_result_df.with_columns(new_columns)
+        detection_result_df = detection_result_df.with_columns(new_columns).with_columns(num_images=num_images)
         print(df_to_string(detection_result_df, args.format))
 
 
