@@ -64,6 +64,7 @@ def gen_relax_comparison_profile(phrase_grounding_model: str, model_name: str) -
 def main():
     parser = argparse.ArgumentParser()
     # https://github.com/gregbanks/python-tabulate#table-format
+    parser.add_argument("glip_name", default="ft2_deberta_mixed_0.5e", help="Config name for GLIP model.")
     parser.add_argument("--table-format", default="github", help="Table format.")
     parser.add_argument(
         "--recall-topk", "--topk", type=int, nargs="*", default=[1, 5, 10], help="For calculating Recall@k."
@@ -73,7 +74,7 @@ def main():
     )
     args = parser.parse_args()
     scenario_ids: list[str] = sum((path.read_text().splitlines() for path in args.id_file), [])
-    exp_configs = gen_relax_comparison_profile("glip", "ft2_mixed_0.5e_win2")
+    exp_configs = gen_relax_comparison_profile("glip", args.glip_name)
     data: dict[ExpConfig, list[str]] = {config: [] for config in exp_configs}
     for exp_config in exp_configs:
         exp_name = exp_config.get_name()
