@@ -21,6 +21,7 @@ from tasks import (
 from utils.annotation import BoundingBox as BoundingBoxAnnotation
 from utils.annotation import ImageAnnotation, ImageTextAnnotation
 from utils.mot import DetectionLabels
+from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import PhraseGroundingPrediction, RelationPrediction
 from utils.util import box_iou
 
@@ -175,7 +176,10 @@ def relax_prediction_with_mot(
     ):
         # このクラスタに属する relation を集める
         relations_in_cluster: list[RelationPrediction] = []
+        # このクラスタに属するかもしれない新たな relation
+        new_relations: list[RelationPrediction] = []
         for gold_bb in gold_bbs:
+            matching_prediction_found = False
             for relation in phrase_prediction.relations:
                 if (
                     relation.type == rel_type
@@ -183,13 +187,39 @@ def relax_prediction_with_mot(
                     and box_iou(relation.bounding_box.rect, gold_bb.rect) >= 0.5
                 ):
                     relations_in_cluster.append(relation)
+                    matching_prediction_found = True
+            if not matching_prediction_found:
+                # 対応する予測 BB がない場合は，False Negative かもしれないので保存しておく
+                new_relation = RelationPrediction(
+                    type=rel_type,
+                    image_id=gold_bb.image_id,
+                    bounding_box=BoundingBoxPrediction(
+                        image_id=gold_bb.image_id,
+                        rect=gold_bb.rect,
+                        confidence=-1.0,
+                    ),
+                )
+                new_relations.append(new_relation)
         if len(relations_in_cluster) == 0:
             continue
+        else:
+            # クラスタに属するBBのうち一つでも注目しているフレーズと関係を持っていれば，他のBBの関係も追加する
+            relations_in_cluster.extend(new_relations)
+        relation_to_modified_confidence: dict[RelationPrediction, float] = {}
         for relation in relations_in_cluster:
             # 先行するフレームの BB のみ考える
-            confidences = [
-                rel.bounding_box.confidence for rel in relations_in_cluster if rel.image_idx <= relation.image_idx
+            preceding_relations = [
+                rel
+                for rel in relations_in_cluster
+                if rel.image_idx <= relation.image_idx and rel.bounding_box.confidence >= 0
             ]
+            if not preceding_relations:
+                continue
+            # 先行するフレームに1つでも関係があれば，MOT由来の新しい関係を追加
+            if relation.bounding_box.confidence == -1.0:
+                phrase_prediction.relations.append(relation)
+
+            confidences = [rel.bounding_box.confidence for rel in preceding_relations]
             if confidence_modification_method == "max":
                 modified_confidence = max(confidences)
             elif confidence_modification_method == "min":
@@ -201,6 +231,10 @@ def relax_prediction_with_mot(
             print(
                 f"{phrase_grounding_prediction.scenario_id}: {relation.image_id}: {gold_bbs[0].class_name}: confidence: {relation.bounding_box.confidence:.6f} -> {modified_confidence:.6f}"
             )
+            relation_to_modified_confidence[relation] = modified_confidence
+        # confidence の修正が他の関係の confidence の修正に影響しないよう一度に修正する
+        for relation, modified_confidence in relation_to_modified_confidence.items():
+            assert modified_confidence >= 0
             relation.bounding_box.confidence = modified_confidence
 
 
