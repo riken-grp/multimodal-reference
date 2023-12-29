@@ -68,6 +68,7 @@ def plot_results(
     fig = plt.figure(figsize=(16, 10))
     np_image = np.array(image)
     ax = fig.add_subplot(111)
+    fig.subplots_adjust(left=0.01, right=0.8, bottom=0.01, top=0.8)
 
     labeled_rectangles: list[LabeledRectangle] = []
 
