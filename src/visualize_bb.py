@@ -7,6 +7,7 @@ from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import colormaps
 from matplotlib.transforms import Bbox
 from PIL import Image, ImageFile
 from rhoknp import BasePhrase, Document, Sentence
@@ -16,23 +17,14 @@ from utils.constants import RELATION_TYPES_ALL
 from utils.prediction import PhraseGroundingPrediction, PhrasePrediction
 from utils.util import DatasetInfo, Rectangle
 
-# colors for visualization
-COLORS = [
-    [0.000, 0.447, 0.741],  # blue
-    [0.850, 0.325, 0.098],  # orange
-    # [0.929, 0.694, 0.125],  # yellow
-    [0.494, 0.184, 0.556],  # purple
-    [0.466, 0.674, 0.188],  # green
-    [0.301, 0.745, 0.933],  # light blue
-]
-
-GOLD_COLOR = [0.929, 0.694, 0.125]  # yellow
+# GOLD_COLOR = (0.929, 0.694, 0.125)  # yellow
+GOLD_COLOR = (1.0, 1.0, 1.0)  # white
 
 
 @dataclass
 class LabeledRectangle:
     rect: Rectangle
-    color: list[float]
+    color: tuple[float, float, float]
     label: str
 
 
@@ -172,7 +164,7 @@ def draw_prediction(
     topk: int,
     relation_types: set[str],
 ) -> list[LabeledRectangle]:
-    colors = cycle(COLORS)
+    colors = cycle(colormaps["tab20"].colors)
     ret = []
     for phrase_prediction in phrase_predictions:
         target_relation_types: set[str] = {relation.type for relation in phrase_prediction.relations} & relation_types
@@ -194,7 +186,7 @@ def draw_prediction(
                     text=get_core_expression(base_phrase)[1],
                     score=pred_bounding_box.confidence,
                 )
-                ret.append(LabeledRectangle(rect=rect, color=next(colors), label=label))
+                ret.append(LabeledRectangle(rect=rect, color=next(colors)[:3], label=label))
     return ret
 
 
