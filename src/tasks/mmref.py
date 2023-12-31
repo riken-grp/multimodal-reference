@@ -44,7 +44,9 @@ class MultimodalReference(luigi.Task):
 
     def requires(self) -> dict[str, luigi.Task]:
         tasks: dict[str, luigi.Task] = {
-            "cohesion": CohesionAnalysis(cfg=self.cfg.cohesion, scenario_id=self.scenario_id),
+            "cohesion": CohesionAnalysis(
+                cfg=self.cfg.cohesion, scenario_id=self.scenario_id, dataset_dir=self.dataset_dir
+            ),
             "grounding": PHRASE_GROUNDING_MODEL_MAP[self.cfg.phrase_grounding_model](
                 cfg=getattr(self.cfg, self.cfg.phrase_grounding_model),
                 scenario_id=self.scenario_id,
