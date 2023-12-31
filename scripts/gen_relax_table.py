@@ -79,25 +79,25 @@ def main():
     for exp_config in exp_configs:
         exp_name = exp_config.get_name()
         precisions = []
-        output = subprocess.run(
-            (
-                f"{sys.executable} src/evaluation.py"
-                f" -d data/dataset"
-                f" -k data/knp"
-                f" -a data/image_text_annotation"
-                f" -p result/mmref/{exp_name}"
-                f" --prediction-knp-dir result/cohesion"
-                # f" --prediction-mot-dir result/mot/default-th0.3"
-                f" --scenario-ids {' '.join(scenario_ids)}"
-                f" --recall-topk {' '.join(map(str, args.recall_topk))}"
-                f" --th 0.0"
-                f" --eval-modes rel"
-                f" --format csv"
-            ).split(),
-            capture_output=True,
-            check=True,
-            text=True,
+        command = (
+            f"{sys.executable} src/evaluation.py"
+            f" -d data/dataset"
+            f" -k data/knp"
+            f" -a data/image_text_annotation"
+            f" -p result/mmref/{exp_name}"
+            f" --prediction-knp-dir result/cohesion"
+            # f" --prediction-mot-dir result/mot/default-th0.3"
+            f" --scenario-ids {' '.join(scenario_ids)}"
+            f" --recall-topk {' '.join(map(str, args.recall_topk))}"
+            f" --th 0.0"
+            f" --eval-modes rel"
+            f" --format csv"
         )
+        try:
+            output = subprocess.run(command.split(), capture_output=True, check=True, text=True)
+        except subprocess.CalledProcessError as e:
+            print(e.stderr, file=sys.stderr)
+            raise e
         rel_metric_table = pl.read_csv(io.StringIO(output.stdout))
         df_rel = rel_metric_table.filter(pl.col("rel_type") == "=")
         for recall_top_k in (1, 5, 10):
