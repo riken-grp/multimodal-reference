@@ -1,0 +1,12 @@
+_target_: tasks.glip_detection.GLIPObjectDetection
+cfg:
+  project_root: /path/to/project
+  python: /path/to/python
+  name: glip
+  recording_dir: ./data/recording
+  prediction_dir: ./result/detection/${.name}
+
+  exp_name: <glip-exp-name>
+  checkpoint: /path/to/checkpoint
+  config: /path/to/config
+  confidence_threshold: 0.5

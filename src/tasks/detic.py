@@ -3,12 +3,12 @@ import pickle
 from pathlib import Path
 from typing import Annotated
 
+import hydra
 import luigi
 import numpy as np
 from omegaconf import DictConfig
 from rhoknp import Document, Sentence
 
-from tasks.detic_detection import DeticObjectDetection
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import (
     PhraseGroundingPrediction,
@@ -30,7 +30,7 @@ class DeticPhraseGrounding(luigi.Task):
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
 
     def requires(self) -> luigi.Task:
-        return DeticObjectDetection(scenario_id=self.scenario_id, cfg=self.cfg.detic_detection)
+        return hydra.utils.instantiate(self.cfg.detection, scenario_id=self.scenario_id)
 
     def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")

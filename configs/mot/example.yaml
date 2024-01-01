@@ -1,6 +1,6 @@
 project_root: /path/to/project
 python: /path/to/python
-name: default-${detic_detection.name}  # mot task depends on detic_detection task
+name: default-${.detection.cfg.name}  # mot task depends on detection task
 recording_dir: ./data/recording
 prediction_dir: ./result/mot/${.name}
-detic_detection: ${detic_detection}
+detection: ${detection}

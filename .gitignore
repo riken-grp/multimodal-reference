@@ -173,3 +173,5 @@ configs/*.yaml
 !configs/base.yaml
 configs/*/*.yaml
 !configs/*/example.yaml
+!configs/detection/detic.yaml
+!configs/detection/glip.yaml
