@@ -1,9 +1,9 @@
 from tasks.cohesion import CohesionAnalysis
 from tasks.detection.detic import DeticObjectDetection
 from tasks.detection.glip import GLIPObjectDetection
-from tasks.detic import DeticPhraseGrounding
-from tasks.glip import GLIPPhraseGrounding
-from tasks.mdetr import MDETRPhraseGrounding
+from tasks.grounding.detic import DeticPhraseGrounding
+from tasks.grounding.glip import GLIPPhraseGrounding
+from tasks.grounding.mdetr import MDETRPhraseGrounding
 
 # from tasks.mmref import MultimodalReference
 from tasks.mot import MultipleObjectTracking
