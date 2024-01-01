@@ -247,7 +247,7 @@ def parse_args():
 def main():
     args = parse_args()
     for scenario_id in args.scenario_ids:
-        export_dir = args.export_dir / args.exp_name / scenario_id
+        export_dir = args.export_dir / f"top{args.topk}_th{args.confidence_threshold}" / args.exp_name / scenario_id
         export_dir.mkdir(parents=True, exist_ok=True)
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())
         image_dir = args.dataset_dir / scenario_id / "images"
