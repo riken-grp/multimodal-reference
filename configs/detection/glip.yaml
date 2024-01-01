@@ -1,4 +1,4 @@
-_target_: tasks.glip_detection.GLIPObjectDetection
+_target_: tasks.detection.glip.GLIPObjectDetection
 cfg:
   project_root: /path/to/project
   python: /path/to/python

@@ -1,4 +1,4 @@
-_target_: tasks.detic_detection.DeticObjectDetection
+_target_: tasks.detection.detic.DeticObjectDetection
 cfg:
   project_root: /path/to/project
   python: /path/to/python
