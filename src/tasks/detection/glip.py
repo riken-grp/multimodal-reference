@@ -1,6 +1,7 @@
 import os
 import socket
 import subprocess
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -51,5 +52,8 @@ class GLIPObjectDetection(luigi.Task, FileBasedResourceManagerMixin[int]):
                 env=env,
                 check=True,
             )
+        except subprocess.CalledProcessError as e:
+            print(e.stderr, file=sys.stderr)
+            raise e
         finally:
             self.release_resource(gpu_id)
