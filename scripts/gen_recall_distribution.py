@@ -38,8 +38,10 @@ def main() -> None:
 
 def visualize(class_score_table: pl.DataFrame, output_file: Path) -> None:
     for recall_top_k in RECALL_TOP_KS:
-        metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
-        class_score_table = class_score_table.rename({f"recall_pos{metric_suffix}": f"Recall{metric_suffix}"})
+        if recall_top_k >= 0:
+            class_score_table = class_score_table.rename({f"recall_pos@{recall_top_k}": f"Recall@{recall_top_k}"})
+        else:
+            class_score_table = class_score_table.rename({"recall_pos": "Recall@inf"})
     class_score_table = (
         class_score_table.rename({"recall_total": "Total"})
         .filter(pl.col("class_name") != "")
@@ -48,7 +50,7 @@ def visualize(class_score_table: pl.DataFrame, output_file: Path) -> None:
     fig = px.bar(
         class_score_table,
         x="class_name",
-        y=["Total", "Recall", "Recall@10", "Recall@5", "Recall@1"],
+        y=["Total", "Recall@inf", "Recall@10", "Recall@5", "Recall@1"],
         # https://plotly.com/python/discrete-color/
         color_discrete_sequence=[
             qualitative.Plotly[3],
