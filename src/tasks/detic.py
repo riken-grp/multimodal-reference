@@ -27,7 +27,7 @@ class DeticPhraseGrounding(luigi.Task):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
+        Path(self.cfg.prediction_dir).mkdir(exist_ok=True, parents=True)
 
     def requires(self) -> luigi.Task:
         return hydra.utils.instantiate(self.cfg.detection, scenario_id=self.scenario_id)
