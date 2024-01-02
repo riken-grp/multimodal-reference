@@ -1,5 +1,7 @@
 import argparse
+import itertools
 import math
+import sys
 from dataclasses import dataclass
 from itertools import cycle, repeat
 from pathlib import Path
@@ -151,7 +153,7 @@ def draw_annotation(
             LabeledRectangle(
                 rect=rect,
                 color=GOLD_COLOR,
-                label=", ".join(labels),
+                label=", ".join(labels) + f": {bounding_box.class_name}_{bounding_box.instance_id}",
             )
         )
     return ret
@@ -193,7 +195,7 @@ def draw_prediction(
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("exp_name", type=str, help="Experiment name (directory name under --export-dir)")
+    parser.add_argument("exp_names", type=str, nargs="+", help="Experiment name.")
     parser.add_argument(
         "--dataset-dir",
         "-d",
@@ -246,20 +248,20 @@ def parse_args():
 
 def main():
     args = parse_args()
-    for scenario_id in args.scenario_ids:
-        export_dir = args.export_dir / f"top{args.topk}_th{args.confidence_threshold}" / args.exp_name / scenario_id
+    for exp_name, scenario_id in itertools.product(args.exp_names, args.scenario_ids):
+        export_dir: Path = args.export_dir / f"top{args.topk}_th{args.confidence_threshold}" / exp_name / scenario_id
         export_dir.mkdir(parents=True, exist_ok=True)
         dataset_info = DatasetInfo.from_json(args.dataset_dir.joinpath(f"{scenario_id}/info.json").read_text())
-        image_dir = args.dataset_dir / scenario_id / "images"
+        image_dir: Path = args.dataset_dir / scenario_id / "images"
         gold_document = Document.from_knp(args.gold_knp_dir.joinpath(f"{scenario_id}.knp").read_text())
         image_text_annotation = ImageTextAnnotation.from_json(
             args.image_annotation_dir.joinpath(f"{scenario_id}.json").read_text()
         )
-        prediction_file = args.prediction_dir / args.exp_name / f"{scenario_id}.json"
+        prediction_file = args.prediction_dir / exp_name / f"{scenario_id}.json"
         if prediction_file.exists():
             prediction = PhraseGroundingPrediction.from_json(prediction_file.read_text())
         else:
-            print(f"Warning: {prediction_file} does not exist.")
+            print(f"Warning: {prediction_file} does not exist.", file=sys.stderr)
             prediction = None
 
         utterance_annotations = image_text_annotation.utterances
