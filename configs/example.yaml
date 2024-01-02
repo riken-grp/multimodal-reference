@@ -18,6 +18,7 @@ gold_annotation_dir: /path/to/gold/annotation
 phrase_grounding_model: glip  # mdetr, glip, detic
 coref_relax_mode: null  # null, pred, gold
 mot_relax_mode: null  # null, pred, gold
+confidence_modification_method: max  # max, mean, min
 
 names:
   mdetr: mdetr_${mdetr.name}
@@ -29,7 +30,7 @@ coref_relax_names:
   gold: -coref_relax_gold
 
 mot_relax_names:
-  pred: -mot_relax_${mot.name}
-  gold: -mot_relax_gold
+  pred: -mot_relax_${mot.name}-${confidence_modification_method}
+  gold: -mot_relax_gold-${confidence_modification_method}
 
 name: ${names[${phrase_grounding_model}]}${get:${coref_relax_names},${coref_relax_mode},""}${get:${mot_relax_names},${mot_relax_mode},""}

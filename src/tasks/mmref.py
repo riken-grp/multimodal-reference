@@ -97,6 +97,7 @@ class MultimodalReference(luigi.Task):
             image_annotations=gold_annotation.images,
             coref_relax_mode=self.cfg.coref_relax_mode,
             mot_relax_mode=self.cfg.mot_relax_mode,
+            confidence_modification_method=self.cfg.confidence_modification_method,
             dataset_info=DatasetInfo.from_json(self.dataset_dir.joinpath("info.json").read_text()),
         )
         with self.output().open(mode="w") as f:
@@ -111,6 +112,7 @@ def run_prediction(
     image_annotations: list[ImageAnnotation],
     coref_relax_mode: Optional[str],
     mot_relax_mode: Optional[str],
+    confidence_modification_method: Literal["max", "min", "mean"],
     dataset_info: DatasetInfo,
 ) -> PhraseGroundingPrediction:
     parsed_document = preprocess_document(cohesion_prediction)
@@ -126,7 +128,7 @@ def run_prediction(
             phrase_grounding_prediction,
             mot_prediction,
             rel_types=["="],
-            confidence_modification_method="max",
+            confidence_modification_method=confidence_modification_method,
             dataset_info=dataset_info,
         )
     elif mot_relax_mode == "gold":
@@ -134,7 +136,7 @@ def run_prediction(
             phrase_grounding_prediction,
             image_annotations,
             rel_types=["="],
-            confidence_modification_method="max",
+            confidence_modification_method=confidence_modification_method,
             dataset_info=dataset_info,
         )
 
@@ -153,7 +155,7 @@ def run_prediction(
                     phrase_grounding_prediction,
                     mot_prediction,
                     rel_types=["="],
-                    confidence_modification_method="max",
+                    confidence_modification_method=confidence_modification_method,
                     dataset_info=dataset_info,
                 )
             elif mot_relax_mode == "gold":
@@ -161,7 +163,7 @@ def run_prediction(
                     phrase_grounding_prediction,
                     image_annotations,
                     rel_types=["="],
-                    confidence_modification_method="max",
+                    confidence_modification_method=confidence_modification_method,
                     dataset_info=dataset_info,
                 )
             count += 1
