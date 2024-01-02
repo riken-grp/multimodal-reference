@@ -40,26 +40,24 @@ class IdMapper:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("exp_name", type=str, help="Experiment name (directory name under result/mmref)")
+    parser.add_argument("exp_names", type=str, nargs="+", help="Experiment name (directory name under result/mmref)")
     parser.add_argument(
         "--id-file", type=Path, nargs="+", default=[Path("data/id/test.id")], help="Paths to scenario id file"
     )
     args = parser.parse_args()
     scenario_ids: list[str] = sum((path.read_text().splitlines() for path in args.id_file), [])
-    with tempfile.TemporaryDirectory() as out_dir:
-        subprocess.run(
-            (
-                f"{sys.executable} src/evaluation.py -p result/mmref/{args.exp_name} --scenario-ids {' '.join(scenario_ids)}"
+    for exp_name in args.exp_names:
+        with tempfile.TemporaryDirectory() as out_dir:
+            command = (
+                f"{sys.executable} src/evaluation.py -p result/mmref/{exp_name} --scenario-ids {' '.join(scenario_ids)}"
                 f" --recall-topk {' '.join(map(str, RECALL_TOP_KS))} --th 0.0 --raw-result-csv {out_dir}/raw_result.csv"
-            ).split(),
-            cwd=Path.cwd(),
-            check=True,
-        )
-        df_raw_result = pl.read_csv(f"{out_dir}/raw_result.csv")
-    output_dir = Path("data") / "frame_accuracy" / args.exp_name
-    output_dir.mkdir(exist_ok=True, parents=True)
-    for scenario_id in scenario_ids:
-        visualize(df_raw_result, scenario_id, output_dir / f"{scenario_id}.pdf")
+            )
+            subprocess.run(command.split(), cwd=Path.cwd(), check=True)
+            df_raw_result = pl.read_csv(f"{out_dir}/raw_result.csv")
+        output_dir = Path("data") / "frame_accuracy" / exp_name
+        output_dir.mkdir(exist_ok=True, parents=True)
+        for scenario_id in scenario_ids:
+            visualize(df_raw_result, scenario_id, output_dir / f"{scenario_id}.pdf")
 
 
 def visualize(comparison_table: pl.DataFrame, scenario_id: str, output_file: Path) -> None:
