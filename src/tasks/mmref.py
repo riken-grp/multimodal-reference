@@ -4,7 +4,7 @@ import math
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean
-from typing import Annotated, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 import luigi
 from omegaconf import DictConfig
@@ -23,7 +23,7 @@ from utils.annotation import ImageAnnotation, ImageTextAnnotation
 from utils.mot import DetectionLabels
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import PhraseGroundingPrediction, RelationPrediction
-from utils.util import box_iou
+from utils.util import DatasetInfo, box_iou
 
 PHRASE_GROUNDING_MODEL_MAP: dict[str, type[luigi.Task]] = {
     "glip": GLIPPhraseGrounding,
@@ -90,52 +90,80 @@ class MultimodalReference(luigi.Task):
             Path(self.cfg.gold_annotation_dir).joinpath(f"{self.scenario_id}.json").read_text()
         )
         prediction = run_prediction(
-            cfg=self.cfg,
             cohesion_prediction=cohesion_prediction,
             phrase_grounding_prediction=phrase_grounding_prediction,
             mot_prediction=mot_prediction,
             gold_document=gold_document,
             image_annotations=gold_annotation.images,
+            coref_relax_mode=self.cfg.coref_relax_mode,
+            mot_relax_mode=self.cfg.mot_relax_mode,
+            dataset_info=DatasetInfo.from_json(self.dataset_dir.joinpath("info.json").read_text()),
         )
         with self.output().open(mode="w") as f:
             f.write(prediction.to_json(ensure_ascii=False, indent=2))
 
 
 def run_prediction(
-    cfg: DictConfig,
     cohesion_prediction: Document,
     phrase_grounding_prediction: PhraseGroundingPrediction,
     mot_prediction: Optional[DetectionLabels],
     gold_document: Document,
     image_annotations: list[ImageAnnotation],
+    coref_relax_mode: Optional[str],
+    mot_relax_mode: Optional[str],
+    dataset_info: DatasetInfo,
 ) -> PhraseGroundingPrediction:
     parsed_document = preprocess_document(cohesion_prediction)
 
-    if cfg.coref_relax_mode == "pred":
+    if coref_relax_mode == "pred":
         relax_prediction_with_coreference(phrase_grounding_prediction, parsed_document)
-    elif cfg.coref_relax_mode == "gold":
+    elif coref_relax_mode == "gold":
         relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
 
-    if cfg.mot_relax_mode == "pred":
+    if mot_relax_mode == "pred":
         assert mot_prediction is not None
-        relax_prediction_with_mot(phrase_grounding_prediction, mot_prediction, rel_types=["="])
-    elif cfg.mot_relax_mode == "gold":
-        relax_prediction_with_mot(phrase_grounding_prediction, image_annotations, rel_types=["="])
+        relax_prediction_with_mot(
+            phrase_grounding_prediction,
+            mot_prediction,
+            rel_types=["="],
+            confidence_modification_method="max",
+            dataset_info=dataset_info,
+        )
+    elif mot_relax_mode == "gold":
+        relax_prediction_with_mot(
+            phrase_grounding_prediction,
+            image_annotations,
+            rel_types=["="],
+            confidence_modification_method="max",
+            dataset_info=dataset_info,
+        )
 
-    if cfg.coref_relax_mode is not None and cfg.mot_relax_mode is not None:
+    if coref_relax_mode is not None and mot_relax_mode is not None:
         # prev_phrase_grounding_prediction = None
         count = 0
         while count < 3:
             # prev_phrase_grounding_prediction = copy.deepcopy(phrase_grounding_prediction)
-            if cfg.coref_relax_mode == "pred":
+            if coref_relax_mode == "pred":
                 relax_prediction_with_coreference(phrase_grounding_prediction, parsed_document)
-            elif cfg.coref_relax_mode == "gold":
+            elif coref_relax_mode == "gold":
                 relax_prediction_with_coreference(phrase_grounding_prediction, gold_document)
-            if cfg.mot_relax_mode == "pred":
+            if mot_relax_mode == "pred":
                 assert mot_prediction is not None
-                relax_prediction_with_mot(phrase_grounding_prediction, mot_prediction, rel_types=["="])
-            elif cfg.mot_relax_mode == "gold":
-                relax_prediction_with_mot(phrase_grounding_prediction, image_annotations, rel_types=["="])
+                relax_prediction_with_mot(
+                    phrase_grounding_prediction,
+                    mot_prediction,
+                    rel_types=["="],
+                    confidence_modification_method="max",
+                    dataset_info=dataset_info,
+                )
+            elif mot_relax_mode == "gold":
+                relax_prediction_with_mot(
+                    phrase_grounding_prediction,
+                    image_annotations,
+                    rel_types=["="],
+                    confidence_modification_method="max",
+                    dataset_info=dataset_info,
+                )
             count += 1
 
     mm_reference_prediction = relax_prediction_with_pas_bridging(phrase_grounding_prediction, parsed_document)
@@ -151,7 +179,8 @@ def relax_prediction_with_mot(
     phrase_grounding_prediction: PhraseGroundingPrediction,
     image_annotations: Union[list[ImageAnnotation], DetectionLabels],
     rel_types: list[str],
-    confidence_modification_method: str = "max",  # min, max, mean
+    confidence_modification_method: Literal["max", "min", "mean"],
+    dataset_info: DatasetInfo,
 ) -> None:
     # create a bounding box cluster according to instance_id
     gold_bb_cluster: dict[str, list[BoundingBoxAnnotation]] = defaultdict(list)
@@ -172,74 +201,90 @@ def relax_prediction_with_mot(
             for gold_bb in image_annotation.bounding_boxes:
                 gold_bb_cluster[gold_bb.instance_id].append(gold_bb)
 
-    phrase_predictions = [pp for utterance in phrase_grounding_prediction.utterances for pp in utterance.phrases]
-    for phrase_prediction, gold_bbs, rel_type in itertools.product(
-        phrase_predictions, gold_bb_cluster.values(), rel_types
-    ):
-        # このクラスタに属する relation を集める
-        relations_in_cluster: list[RelationPrediction] = []
-        # このクラスタに属するかもしれない新たな relation
-        new_relations: list[RelationPrediction] = []
-        # gold_bbs には該当フレーム内で参照されていない物体も含まれる
+    image_id_to_bbs: dict[str, list[BoundingBoxAnnotation]] = defaultdict(list)
+    for gold_bbs in gold_bb_cluster.values():
         for gold_bb in gold_bbs:
-            matching_prediction_found = False
-            for relation in phrase_prediction.relations:
-                if (
-                    relation.type == rel_type
-                    and relation.image_id == gold_bb.image_id
-                    and box_iou(relation.bounding_box.rect, gold_bb.rect) >= 0.5
-                ):
-                    relations_in_cluster.append(relation)
-                    matching_prediction_found = True
-            if not matching_prediction_found:
-                # 対応する予測 BB がない場合は，False Negative かもしれないので保存しておく
-                new_relation = RelationPrediction(
-                    type=rel_type,
-                    image_id=gold_bb.image_id,
-                    bounding_box=BoundingBoxPrediction(
-                        image_id=gold_bb.image_id,
-                        rect=gold_bb.rect,
-                        confidence=-1.0,
-                    ),
-                )
-                new_relations.append(new_relation)
-        if len(relations_in_cluster) == 0:
-            continue
-        else:
-            # クラスタに属するBBのうち一つでも注目しているフレーズと関係を持っていれば，他のBBの関係も追加する
-            relations_in_cluster.extend(new_relations)
-        relation_to_modified_confidence: dict[RelationPrediction, float] = {}
-        for relation in relations_in_cluster:
-            # 自らと先行するフレームの関係のみ考える
-            preceding_relations = [
-                relation,
-                *[rel for rel in relations_in_cluster if rel.image_idx < relation.image_idx],
-            ]
-            # MOT 由来の関係を除外して元々付与されていた関係のみ考える
-            preceding_original_relations = [rel for rel in preceding_relations if rel.bounding_box.confidence >= 0]
-            if not preceding_original_relations:
-                continue
-            # 先行するフレームに1つでも関係があれば，MOT由来の新しい関係を追加
-            if relation.bounding_box.confidence == -1.0:
-                phrase_prediction.relations.append(relation)
+            image_id_to_bbs[gold_bb.image_id].append(gold_bb)
 
-            confidences = [rel.bounding_box.confidence for rel in preceding_original_relations]
-            if confidence_modification_method == "max":
-                modified_confidence = max(confidences)
-            elif confidence_modification_method == "min":
-                modified_confidence = min(confidences)
-            elif confidence_modification_method == "mean":
-                modified_confidence = mean(confidences)
-            else:
-                raise NotImplementedError
-            print(
-                f"{phrase_grounding_prediction.scenario_id}: {relation.image_id}: {gold_bbs[0].class_name}: confidence: {relation.bounding_box.confidence:.6f} -> {modified_confidence:.6f}"
-            )
-            relation_to_modified_confidence[relation] = modified_confidence
-        # confidence の修正が他の関係の confidence の修正に影響しないよう一度に修正する
-        for relation, modified_confidence in relation_to_modified_confidence.items():
-            assert modified_confidence >= 0
-            relation.bounding_box.confidence = modified_confidence
+    assert len(phrase_grounding_prediction.utterances) == len(dataset_info.utterances)
+    for idx, utterance_prediction in enumerate(phrase_grounding_prediction.utterances):
+        if idx + 1 < len(dataset_info.utterances):
+            next_utterance = dataset_info.utterances[idx + 1]
+            end_index = math.ceil(next_utterance.start / 1000)
+        else:
+            end_index = len(dataset_info.images)
+        images_before_in_utterance = dataset_info.images[:end_index]
+
+        # フレーズ・格は独立
+        for phrase_prediction, rel_type in itertools.product(utterance_prediction.phrases, rel_types):
+            instance_id_to_relations: dict[str, list[RelationPrediction]] = defaultdict(list)
+            relation_to_matched_bb: dict[RelationPrediction, BoundingBoxAnnotation] = {}
+            # まずそれぞれの relation について最も IoU が高い MOT 由来の BB を割り当てる
+            for relation in [rel for rel in phrase_prediction.relations if rel.type == rel_type]:
+                bb_ious_in_frame = [
+                    (bb, box_iou(relation.bounding_box.rect, bb.rect)) for bb in image_id_to_bbs[relation.image_id]
+                ]
+                # 最も IoU が高い gold_bb を探す
+                gold_bb, iou = max(bb_ious_in_frame, key=lambda x: x[1])
+                if iou < 0.5:
+                    continue
+                instance_id_to_relations[gold_bb.instance_id].append(relation)
+                relation_to_matched_bb[relation] = gold_bb
+
+            relation_to_modified_confidence: dict[RelationPrediction, float] = {}
+            for instance_id, relations in instance_id_to_relations.items():
+                relations_in_cluster: list[RelationPrediction] = relations[:]
+                gold_bbs = gold_bb_cluster[instance_id]
+                matched_bbs = [relation_to_matched_bb[rel] for rel in relations]
+                unmatched_bbs = [bb for bb in gold_bbs if bb not in matched_bbs]
+                # 現在か過去のBBのみ新規追加
+                for image in images_before_in_utterance:
+                    relations_in_cluster += [
+                        RelationPrediction(
+                            type=rel_type,
+                            image_id=image.id,
+                            bounding_box=BoundingBoxPrediction(
+                                image_id=image.id,
+                                rect=bb.rect,
+                                confidence=-1.0,
+                            ),
+                        )
+                        for bb in unmatched_bbs
+                        if bb.image_id == image.id
+                    ]
+                for relation in relations_in_cluster:
+                    # 自らと先行するフレームの関係のみ考える
+                    preceding_relations = [
+                        relation,
+                        *[rel for rel in relations_in_cluster if rel.image_idx < relation.image_idx],
+                    ]
+                    # MOT 由来の関係を除外して元々付与されていた関係のみ考える
+                    preceding_original_relations = [
+                        rel for rel in preceding_relations if rel.bounding_box.confidence >= 0
+                    ]
+                    if not preceding_original_relations:
+                        continue
+                    # 先行するフレームに1つでも関係があれば，MOT由来の新しい関係を追加
+                    if relation.bounding_box.confidence == -1.0:
+                        phrase_prediction.relations.append(relation)
+
+                    confidences = [rel.bounding_box.confidence for rel in preceding_original_relations]
+                    if confidence_modification_method == "max":
+                        modified_confidence = max(confidences)
+                    elif confidence_modification_method == "min":
+                        modified_confidence = min(confidences)
+                    elif confidence_modification_method == "mean":
+                        modified_confidence = mean(confidences)
+                    else:
+                        raise NotImplementedError
+                    print(
+                        f"{phrase_grounding_prediction.scenario_id}: {relation.image_id}: {gold_bbs[0].class_name}: confidence: {relation.bounding_box.confidence:.6f} -> {modified_confidence:.6f}"
+                    )
+                    relation_to_modified_confidence[relation] = modified_confidence
+            # confidence の修正が他の関係の confidence の修正に影響しないよう一度に修正する
+            for relation, modified_confidence in relation_to_modified_confidence.items():
+                assert modified_confidence >= 0
+                relation.bounding_box.confidence = modified_confidence
 
 
 def relax_prediction_with_coreference(
