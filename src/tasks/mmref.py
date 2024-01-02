@@ -180,6 +180,7 @@ def relax_prediction_with_mot(
         relations_in_cluster: list[RelationPrediction] = []
         # このクラスタに属するかもしれない新たな relation
         new_relations: list[RelationPrediction] = []
+        # gold_bbs には該当フレーム内で参照されていない物体も含まれる
         for gold_bb in gold_bbs:
             matching_prediction_found = False
             for relation in phrase_prediction.relations:
@@ -209,19 +210,20 @@ def relax_prediction_with_mot(
             relations_in_cluster.extend(new_relations)
         relation_to_modified_confidence: dict[RelationPrediction, float] = {}
         for relation in relations_in_cluster:
-            # 先行するフレームの BB のみ考える
+            # 自らと先行するフレームの関係のみ考える
             preceding_relations = [
-                rel
-                for rel in relations_in_cluster
-                if rel.image_idx <= relation.image_idx and rel.bounding_box.confidence >= 0
+                relation,
+                *[rel for rel in relations_in_cluster if rel.image_idx < relation.image_idx],
             ]
-            if not preceding_relations:
+            # MOT 由来の関係を除外して元々付与されていた関係のみ考える
+            preceding_original_relations = [rel for rel in preceding_relations if rel.bounding_box.confidence >= 0]
+            if not preceding_original_relations:
                 continue
             # 先行するフレームに1つでも関係があれば，MOT由来の新しい関係を追加
             if relation.bounding_box.confidence == -1.0:
                 phrase_prediction.relations.append(relation)
 
-            confidences = [rel.bounding_box.confidence for rel in preceding_relations]
+            confidences = [rel.bounding_box.confidence for rel in preceding_original_relations]
             if confidence_modification_method == "max":
                 modified_confidence = max(confidences)
             elif confidence_modification_method == "min":
