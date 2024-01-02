@@ -224,6 +224,8 @@ def relax_prediction_with_mot(
                 bb_ious_in_frame = [
                     (bb, box_iou(relation.bounding_box.rect, bb.rect)) for bb in image_id_to_bbs[relation.image_id]
                 ]
+                if not bb_ious_in_frame:
+                    continue
                 # 最も IoU が高い gold_bb を探す
                 gold_bb, iou = max(bb_ious_in_frame, key=lambda x: x[1])
                 if iou < 0.5:
