@@ -44,10 +44,10 @@ def gen_relax_comparison_profile(phrase_grounding_model: str, model_name: str) -
         (None, None),
         ("pred", None),
         ("gold", None),
-        (None, "default-detic_th0.3"),
-        (None, "gold"),
-        ("pred", "default-detic_th0.3"),
-        ("gold", "gold"),
+        (None, "default-detic_th0.3-max"),
+        (None, "gold-max"),
+        ("pred", "default-detic_th0.3-max"),
+        ("gold", "gold-max"),
     ]
     for coref_relax_mode, mot_relax_mode in relax_modes:
         configs.append(
