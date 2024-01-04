@@ -2,9 +2,7 @@ import argparse
 import subprocess
 import sys
 import tempfile
-from collections import defaultdict
 from pathlib import Path
-from statistics import mean
 
 import plotly.express as px
 import polars as pl
@@ -42,8 +40,7 @@ def visualize(comparison_table: pl.DataFrame, output_file: Path) -> None:
         .filter(pl.col("class_name") != "")
         .drop(["scenario_id", "image_id", "sid", "base_phrase_index", "rel_type", "instance_id_or_pred_idx"])
     )
-    ranks = []
-    sizes = []
+    data = []
     for row in comparison_table.to_dicts():
         rank = -1
         for recall_topk in RECALL_TOP_KS:
@@ -51,27 +48,25 @@ def visualize(comparison_table: pl.DataFrame, output_file: Path) -> None:
             if row[f"recall_pos{metric_suffix}"] > 0:
                 rank = recall_topk
                 break
-        ranks.append(rank)
-        sizes.append(row["width"] * row["height"] / IMAGE_SIZE)
+        data.append({"rank": rank, "size": row["width"] * row["height"] / IMAGE_SIZE})
+    df_size = pl.DataFrame(data)
 
-    # Calculate averages
-    average_sizes_per_rank = defaultdict(list)
-    for rank, size in zip(ranks, sizes):
-        average_sizes_per_rank[rank].append(size)
+    fig = px.scatter(df_size, x="size", y="rank", log_x=True)
 
-    averages = {rank: mean(sizes) for rank, sizes in average_sizes_per_rank.items()}
-
-    fig = px.scatter(x=sizes, y=ranks, labels={"x": "Frame Occupancy", "y": "Rank"}, log_x=True)
-
+    # Plot averages
+    df_size_average = df_size.group_by("rank").agg(pl.mean("size")).sort(by="rank")
     fig.add_scatter(
-        x=list(averages.values()), y=list(averages.keys()), mode="markers", marker=dict(color="red"), name="Average"
+        x=df_size_average["size"], y=df_size_average["rank"], mode="markers", marker=dict(color="red"), name="Average"
     )
     fig.update_layout(
         barmode="overlay",
+        xaxis=dict(
+            title="Frame Occupancy",
+        ),
         # https://plotly.com/python/reference/layout/yaxis/
         yaxis=dict(
             type="category",
-            # title="Rank",
+            title="Rank",
             categoryarray=list(reversed([*range(1, 11), 100, -1])),
             tickmode="array",
             tickvals=list(reversed([*range(1, 11), 100, -1])),
