@@ -217,6 +217,8 @@ class MMRefEvaluator:
                     "height": key[8],
                     "center_x": key[9],
                     "center_y": key[10],
+                    "pos": key[11],
+                    "subpos": key[12],
                     "recall_total": metrics.get("recall_total", 0),
                     "precision_pos": metrics.get("precision_pos", 0),
                     "precision_total": metrics.get("precision_total", 0),
@@ -296,6 +298,8 @@ class MMRefEvaluator:
                         gold_bounding_box.rect.h,
                         gold_bounding_box.rect.cx,
                         gold_bounding_box.rect.cy,
+                        base_phrase.head.pos,
+                        base_phrase.head.subpos,
                     )
                     pred_bounding_boxes: list[BoundingBoxPrediction] = sorted(
                         {rel.bounding_box for rel in pred_relations if rel.type == relation_type},
@@ -335,6 +339,8 @@ class MMRefEvaluator:
                         pred_rect.h,
                         pred_rect.cx,
                         pred_rect.cy,
+                        base_phrase.head.pos,
+                        base_phrase.head.subpos,
                     )
                     rects = [
                         (pred_relation.bounding_box.confidence, box_iou(gold_bounding_box.rect, pred_rect))
@@ -394,7 +400,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=["rel"],
         nargs="+",
-        choices=["rel", "class", "size", "text", "mot", "detection"],
+        choices=["rel", "class", "size", "noun", "text", "mot", "detection"],
         help="Evaluation modes.",
     )
     parser.add_argument(
@@ -428,7 +434,7 @@ def main() -> None:
             eval_results["detection"] += evaluator.eval_object_detection(
                 pred_detection, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
             )
-        if set(args.eval_modes) & {"rel", "class", "size"}:
+        if set(args.eval_modes) & {"rel", "class", "size", "noun"}:
             prediction = PhraseGroundingPrediction.from_json(
                 args.prediction_mmref_dir.joinpath(f"{scenario_id}.json").read_text()
             )
@@ -451,7 +457,7 @@ def main() -> None:
         )
         print(df_to_string(pl.from_pandas(summary.tail(1)), args.format))
 
-    if set(args.eval_modes) & {"rel", "class", "size"}:
+    if set(args.eval_modes) & {"rel", "class", "size", "noun"}:
         mmref_result_df = pl.DataFrame(eval_results["mmref"])
         if args.raw_result_csv is not None:
             mmref_result_df.write_csv(args.raw_result_csv)
@@ -464,6 +470,9 @@ def main() -> None:
 
         if "size" in args.eval_modes:
             print_size_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
+
+        if "noun" in args.eval_modes:
+            print_noun_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "detection" in args.eval_modes:
         detection_result_df = pl.DataFrame(eval_results["detection"])
@@ -592,6 +601,38 @@ def print_size_table(
         df_size = df_size.with_columns(new_columns)
         print((min_size, max_size))
         print(df_to_string(df_size, format_, column_prefixes))
+
+
+def print_noun_table(
+    mmref_result_df: pl.DataFrame,
+    recall_top_ks: list[int],
+    column_prefixes: list[str],
+    format_: str = "repr",
+) -> None:
+    mmref_result_df = mmref_result_df.filter(pl.col("rel_type") == "=")
+    df_class = (
+        mmref_result_df.group_by(["pos", "subpos"], maintain_order=True)
+        .sum()
+        .drop(
+            [
+                "scenario_id",
+                "image_id",
+                "utterance_id",
+                "sid",
+                "base_phrase_index",
+                "rel_type",
+                "instance_id_or_pred_idx",
+            ]
+        )
+    )
+    new_columns = [(df_class["precision_pos"] / df_class["precision_total"]).alias("precision")]
+    for recall_top_k in recall_top_ks:
+        metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
+        new_columns.append(
+            (df_class["recall_pos" + metric_suffix] / df_class["recall_total"]).alias("recall" + metric_suffix)
+        )
+    df_class = df_class.with_columns(new_columns)
+    print(df_to_string(df_class, format_, column_prefixes))
 
 
 def df_to_string(table: pl.DataFrame, format_: str, column_prefixes: Optional[list] = None) -> str:
