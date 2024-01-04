@@ -394,7 +394,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=["rel"],
         nargs="+",
-        choices=["rel", "class", "text", "mot", "detection"],
+        choices=["rel", "class", "size", "text", "mot", "detection"],
         help="Evaluation modes.",
     )
     parser.add_argument(
@@ -428,7 +428,7 @@ def main() -> None:
             eval_results["detection"] += evaluator.eval_object_detection(
                 pred_detection, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
             )
-        if "rel" in args.eval_modes or "class" in args.eval_modes:
+        if set(args.eval_modes) & {"rel", "class", "size"}:
             prediction = PhraseGroundingPrediction.from_json(
                 args.prediction_mmref_dir.joinpath(f"{scenario_id}.json").read_text()
             )
@@ -451,7 +451,7 @@ def main() -> None:
         )
         print(df_to_string(pl.from_pandas(summary.tail(1)), args.format))
 
-    if "rel" in args.eval_modes or "class" in args.eval_modes:
+    if set(args.eval_modes) & {"rel", "class", "size"}:
         mmref_result_df = pl.DataFrame(eval_results["mmref"])
         if args.raw_result_csv is not None:
             mmref_result_df.write_csv(args.raw_result_csv)
@@ -461,6 +461,9 @@ def main() -> None:
 
         if "class" in args.eval_modes:
             print_class_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
+
+        if "size" in args.eval_modes:
+            print_size_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "detection" in args.eval_modes:
         detection_result_df = pl.DataFrame(eval_results["detection"])
@@ -554,10 +557,46 @@ def print_class_table(
     print(df_to_string(df_class, format_, column_prefixes))
 
 
+def print_size_table(
+    mmref_result_df: pl.DataFrame,
+    recall_top_ks: list[int],
+    column_prefixes: list[str],
+    format_: str = "repr",
+) -> None:
+    image_size = 1920 * 1080
+    mmref_result_df = mmref_result_df.filter(pl.col("rel_type") == "=").with_columns(
+        (pl.col("width") * pl.col("height") / image_size).alias("size")
+    )
+    for min_size, max_size in [(0, 0.005), (0.005, 0.05), (0.05, 1)]:
+        df_size = (
+            mmref_result_df.filter((pl.col("size") >= min_size) & (pl.col("size") < max_size))
+            .sum()
+            .drop(
+                [
+                    "scenario_id",
+                    "image_id",
+                    "utterance_id",
+                    "sid",
+                    "base_phrase_index",
+                    "rel_type",
+                    "instance_id_or_pred_idx",
+                ]
+            )
+        )
+        new_columns = [(df_size["precision_pos"] / df_size["precision_total"]).alias("precision")]
+        for recall_top_k in recall_top_ks:
+            metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
+            new_columns.append(
+                (df_size["recall_pos" + metric_suffix] / df_size["recall_total"]).alias("recall" + metric_suffix)
+            )
+        df_size = df_size.with_columns(new_columns)
+        print((min_size, max_size))
+        print(df_to_string(df_size, format_, column_prefixes))
+
+
 def df_to_string(table: pl.DataFrame, format_: str, column_prefixes: Optional[list] = None) -> str:
     if column_prefixes is not None:
         columns = [column for column in table.columns if column.startswith(tuple(column_prefixes))]
-        assert "rel_type" in columns, "rel_type must be included in column_prefixes"
         table = table.select(*columns)
     if format_ == "repr":
         pl.Config.set_tbl_rows(100)
