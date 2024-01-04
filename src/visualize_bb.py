@@ -17,7 +17,7 @@ from rhoknp import BasePhrase, Document, Sentence
 from utils.annotation import ImageAnnotation, ImageTextAnnotation, PhraseAnnotation
 from utils.constants import RELATION_TYPES_ALL
 from utils.prediction import PhraseGroundingPrediction, PhrasePrediction
-from utils.util import DatasetInfo, Rectangle
+from utils.util import DatasetInfo, IdMapper, Rectangle
 
 # GOLD_COLOR = (0.929, 0.694, 0.125)  # yellow
 GOLD_COLOR = (1.0, 1.0, 1.0)  # white
@@ -63,6 +63,7 @@ def plot_results(
     export_dir: Path,
     plots: list[str],
     relation_types: set[str],
+    id_mapper: Optional[IdMapper],
     confidence_threshold: float = 0.0,
     topk: int = -1,
     class_names: Optional[set[str]] = None,
@@ -81,7 +82,7 @@ def plot_results(
 
     if "gold" in plots:
         labeled_rectangles += draw_annotation(
-            base_phrases, phrase_annotations, image_annotation, relation_types, class_names
+            base_phrases, phrase_annotations, image_annotation, relation_types, class_names, id_mapper
         )
 
     drawn_bbs: set[Bbox] = set()
@@ -133,6 +134,7 @@ def draw_annotation(
     image_annotation: ImageAnnotation,
     relation_types: set[str],
     class_names: Optional[set[str]],
+    id_mapper: Optional[IdMapper],
 ) -> list[LabeledRectangle]:
     ret = []
     for bounding_box in image_annotation.bounding_boxes:
@@ -149,13 +151,12 @@ def draw_annotation(
                     labels.append(f"{relation.type}_{get_core_expression(base_phrase)[1]}")
         if not labels:
             continue
-        ret.append(
-            LabeledRectangle(
-                rect=rect,
-                color=GOLD_COLOR,
-                label=", ".join(labels) + f": {bounding_box.class_name}_{bounding_box.instance_id}",
-            )
-        )
+        label = ", ".join(labels)
+        instance_id = bounding_box.instance_id
+        if id_mapper is not None:
+            instance_id = str(id_mapper.map(instance_id))
+        label += f": {bounding_box.class_name}_{instance_id}"
+        ret.append(LabeledRectangle(rect=rect, color=GOLD_COLOR, label=label))
     return ret
 
 
@@ -243,6 +244,7 @@ def parse_args():
     )
     parser.add_argument("--topk", type=int, default=-1, help="Visualizing top-k predictions.")
     parser.add_argument("--class-names", type=str, nargs="*", default=None, help="Class names to visualize.")
+    parser.add_argument("--int-instance-id", action="store_true", help="Use integer instance id.")
     return parser.parse_args()
 
 
@@ -263,6 +265,8 @@ def main():
         else:
             print(f"Warning: {prediction_file} does not exist.", file=sys.stderr)
             prediction = None
+
+        id_mapper = IdMapper() if args.int_instance_id else None
 
         utterance_annotations = image_text_annotation.utterances
         image_id_to_annotation = {
@@ -292,6 +296,7 @@ def main():
                     export_dir=export_dir,
                     plots=args.plots,
                     relation_types=set(args.relation_types),
+                    id_mapper=id_mapper,
                     confidence_threshold=args.confidence_threshold,
                     topk=args.topk,
                     class_names=set(args.class_names) if args.class_names is not None else None,
