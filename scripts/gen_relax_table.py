@@ -44,9 +44,9 @@ def gen_relax_comparison_profile(phrase_grounding_model: str, model_name: str, m
         (None, None),
         ("pred", None),
         ("gold", None),
-        (None, f"default-{mot_name}-max"),
+        (None, f"{mot_name}-max"),
         (None, "gold-max"),
-        ("pred", f"default-{mot_name}-max"),
+        ("pred", f"{mot_name}-max"),
         ("gold", "gold-max"),
     ]
     for coref_relax_mode, mot_relax_mode in relax_modes:
