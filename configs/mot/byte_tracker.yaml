@@ -1,0 +1,7 @@
+defaults:
+  - base.yaml
+  - _self_
+
+tracker:
+  _target_: boxmot.BYTETracker
+name: byte_tracker-${.detection.cfg.name}  # mot task depends on detection task
