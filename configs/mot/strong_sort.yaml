@@ -7,6 +7,9 @@ tracker:
   model_weights:
     _target_: pathlib.Path
     _args_: [./model/osnet_ain_x1_0_msmt17.pt]  # choose from https://kaiyangzhou.github.io/deep-person-reid/MODEL_ZOO
-  fp16: False
   device: cpu
+  fp16: false
+  max_dist: 0.3  # The matching threshold. Samples with larger distance are considered an invalid match.
+  max_iou_dist: 0.9  # Gating threshold. Associations with cost larger than this value are disregarded.
+  max_age: 150  #  Maximum number of missed misses before a track is deleted.
 name: strong_sort-${.detection.cfg.name}  # mot task depends on detection task
