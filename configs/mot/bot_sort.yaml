@@ -4,4 +4,4 @@ defaults:
 
 tracker:
   _target_: boxmot.BoTSORT
-name: box_sort-${.detection.cfg.name}  # mot task depends on detection task
+name: bot_sort-${.detection.cfg.name}  # mot task depends on detection task
