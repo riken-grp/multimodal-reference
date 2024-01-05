@@ -7,6 +7,6 @@ tracker:
   model_weights:
     _target_: pathlib.Path
     _args_: [./model/osnet_ain_x1_0_msmt17.pt]  # choose from https://kaiyangzhou.github.io/deep-person-reid/MODEL_ZOO
-  fp16: False
+  fp16: false
   device: cpu
 name: bot_sort-${.detection.cfg.name}  # mot task depends on detection task
