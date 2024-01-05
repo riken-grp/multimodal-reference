@@ -163,6 +163,8 @@ data
 model
 !tests/data
 result*
+/*.json
+!/lvis_categories.json
 
 *.png
 !tests/data/**/*.png
