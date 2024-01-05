@@ -4,6 +4,4 @@ defaults:
 
 tracker:
   _target_: boxmot.HybridSORT
-  model_weights: ./model/osnet_ain_x1_0_msmt17.pt
-  fp16: False
 name: hybrid_sort-${.detection.cfg.name}  # mot task depends on detection task

@@ -3,7 +3,5 @@ defaults:
   - _self_
 
 tracker:
-  _target_: boxmot.StrongSort
-  model_weights: ./model/osnet_ain_x1_0_msmt17.pt
-  fp16: False
+  _target_: boxmot.StrongSORT
 name: strong_sort-${.detection.cfg.name}  # mot task depends on detection task

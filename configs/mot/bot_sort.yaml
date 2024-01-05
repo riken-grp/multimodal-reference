@@ -4,6 +4,4 @@ defaults:
 
 tracker:
   _target_: boxmot.BoTSORT
-  model_weights: ./model/osnet_ain_x1_0_msmt17.pt
-  fp16: False
 name: box_sort-${.detection.cfg.name}  # mot task depends on detection task

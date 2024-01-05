@@ -1,3 +1,10 @@
+tracker:
+  _target_: boxmot.BoTSORT
+  model_weights:
+    _target_: pathlib.Path
+    _args_: [./model/osnet_ain_x1_0_msmt17.pt]
+  fp16: False
+
 name: base-${.detection.cfg.name}  # mot task depends on detection task
 recording_dir: ./data/recording
 prediction_dir: ./result/mot/${.name}
