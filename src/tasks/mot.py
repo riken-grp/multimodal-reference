@@ -61,9 +61,9 @@ class MultipleObjectTracking(luigi.Task, FileBasedResourceManagerMixin[int]):
         if (gpu_id := self.acquire_resource()) is None:
             raise RuntimeError("No available GPU.")
         try:
-            tracker: Tracker = hydra.utils.instantiate(
-                cfg.tracker, device=f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu"
-            )
+            if hasattr(cfg.tracker, "device"):
+                cfg.tracker.device = f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu"
+            tracker: Tracker = hydra.utils.instantiate(cfg.tracker)
             with self.input().open(mode="r") as f:
                 detection_dump: list[np.ndarray] = pickle.load(f)
             class_names: list[str] = json.loads(Path("lvis_categories.json").read_text())

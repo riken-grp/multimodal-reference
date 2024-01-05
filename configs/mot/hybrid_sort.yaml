@@ -4,4 +4,8 @@ defaults:
 
 tracker:
   _target_: boxmot.HybridSORT
+  reid_weights: null
+  device: cpu
+  half: false
+  det_thresh: 0.3
 name: hybrid_sort-${.detection.cfg.name}  # mot task depends on detection task
