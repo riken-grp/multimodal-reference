@@ -47,7 +47,7 @@ class DEViTObjectDetection(luigi.Task, FileBasedResourceManagerMixin[int]):
                     f"--model-path={cfg.model}",
                     f"--video-file={input_video_file.resolve()}",
                     f"--output-file={self.output().path}",
-                    "--category-space=None",
+                    "--category-space-file=None",
                     "--device=cuda",
                     f"--topk={cfg.class_topk}",
                     f"--threshold={cfg.confidence_threshold}",
