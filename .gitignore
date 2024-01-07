@@ -176,4 +176,5 @@ configs/*/*.yaml
 !configs/*/example.yaml
 !configs/mot/*.yaml
 !configs/detection/detic.yaml
+!configs/detection/devit.yaml
 !configs/detection/glip.yaml

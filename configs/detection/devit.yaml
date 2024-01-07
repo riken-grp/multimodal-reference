@@ -1,0 +1,14 @@
+_target_: tasks.detection.devit.DEViTObjectDetection
+cfg:
+  project_root: /path/to/project
+  python: /path/to/python
+  name: devit
+  recording_dir: ./data/recording
+  prediction_dir: ./result/detection/${.name}
+
+  exp_name: Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size
+  config: ${.project_root}/configs/open-vocabulary/lvis/vitl.yaml
+  rpn_config: ${.project_root}/configs/RPN/mask_rcnn_R_50_FPN_1x.yaml
+  model: ${.project_root}/weights/trained/open-vocabulary/lvis/vitl_0069999.pth
+  class_topk: 10
+  confidence_threshold: 0.3
