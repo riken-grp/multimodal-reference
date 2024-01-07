@@ -66,7 +66,10 @@ class MultipleObjectTracking(luigi.Task, FileBasedResourceManagerMixin[int]):
             tracker: Tracker = hydra.utils.instantiate(cfg.tracker)
             with self.input().open(mode="r") as f:
                 detection_dump: list[np.ndarray] = pickle.load(f)
-            class_names: list[str] = json.loads(Path("lvis_categories.json").read_text())
+            if (class_name_file := Path(self.input().path).parent.joinpath("class_names.txt")).exists():
+                class_names: list[str] = [line.strip() for line in class_name_file.read_text().splitlines()]
+            else:
+                class_names = json.loads(Path("lvis_categories.json").read_text())
             detection_labels = run_tracker(tracker, input_video_file, detection_dump, class_names)
             with self.output().open(mode="w") as f:
                 f.write(detection_labels.to_json(ensure_ascii=False, indent=2))
