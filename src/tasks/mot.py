@@ -89,7 +89,7 @@ def run_tracker(
     video = cv2.VideoCapture(str(input_video_file))
 
     frames = []
-    frame: np.ndarray  # (h, w, 3)
+    frame: np.ndarray  # (h, w, 3), BGR
     for idx, frame in enumerate(frame_from_video(video)):
         if idx >= len(detection_dump):
             break
