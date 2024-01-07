@@ -41,7 +41,7 @@ class DEViTObjectDetection(luigi.Task, FileBasedResourceManagerMixin[int]):
             subprocess.run(
                 [
                     cfg.python,
-                    f"{cfg.project_root}/demo/demo.py",
+                    f"{cfg.project_root}/demo/video.py",
                     f"--config-file={cfg.config}",
                     f"--rpn-config-file={cfg.rpn_config}",
                     f"--model-path={cfg.model}",
