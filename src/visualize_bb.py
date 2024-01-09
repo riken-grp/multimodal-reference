@@ -67,6 +67,7 @@ def plot_results(
     confidence_threshold: float = 0.0,
     topk: int = -1,
     class_names: Optional[set[str]] = None,
+    phrases: Optional[set[str]] = None,
 ) -> None:
     fig = plt.figure(figsize=(16, 10))
     np_image = np.array(image)
@@ -77,12 +78,18 @@ def plot_results(
 
     if "pred" in plots:
         labeled_rectangles += draw_prediction(
-            base_phrases, phrase_predictions, image_annotation.image_id, confidence_threshold, topk, relation_types
+            base_phrases,
+            phrase_predictions,
+            image_annotation.image_id,
+            confidence_threshold,
+            topk,
+            relation_types,
+            phrases,
         )
 
     if "gold" in plots:
         labeled_rectangles += draw_annotation(
-            base_phrases, phrase_annotations, image_annotation, relation_types, class_names, id_mapper
+            base_phrases, phrase_annotations, image_annotation, relation_types, class_names, phrases, id_mapper
         )
 
     drawn_bbs: set[Bbox] = set()
@@ -134,6 +141,7 @@ def draw_annotation(
     image_annotation: ImageAnnotation,
     relation_types: set[str],
     class_names: Optional[set[str]],
+    phrases: Optional[set[str]],
     id_mapper: Optional[IdMapper],
 ) -> list[LabeledRectangle]:
     ret = []
@@ -148,7 +156,10 @@ def draw_annotation(
                 if relation.type not in relation_types:
                     continue
                 if relation.instance_id == bounding_box.instance_id:
-                    labels.append(f"{relation.type}_{get_core_expression(base_phrase)[1]}")
+                    core_expression = get_core_expression(base_phrase)[1]
+                    if phrases is not None and core_expression not in phrases:
+                        continue
+                    labels.append(f"{relation.type}_{core_expression}")
         if not labels:
             continue
         label = ", ".join(labels)
@@ -167,6 +178,7 @@ def draw_prediction(
     confidence_threshold: float,
     topk: int,
     relation_types: set[str],
+    phrases: Optional[set[str]],
 ) -> list[LabeledRectangle]:
     colors = cycle(colormaps["tab20"].colors)
     ret = []
@@ -185,11 +197,10 @@ def draw_prediction(
                 pred_bounding_box = pred_relation.bounding_box
                 rect = pred_bounding_box.rect
                 base_phrase = next(filter(lambda bp: bp.text == phrase_prediction.text, base_phrases))
-                label = "{type}_{text}: {score:0.2f}".format(
-                    type=pred_relation.type,
-                    text=get_core_expression(base_phrase)[1],
-                    score=pred_bounding_box.confidence,
-                )
+                core_expression = get_core_expression(base_phrase)[1]
+                if phrases is not None and core_expression not in phrases:
+                    continue
+                label = f"{pred_relation.type}_{core_expression}: {pred_bounding_box.confidence:0.2f}"
                 ret.append(LabeledRectangle(rect=rect, color=next(colors)[:3], label=label))
     return ret
 
@@ -243,7 +254,10 @@ def parse_args():
         help="Confidence threshold for predicted bounding boxes.",
     )
     parser.add_argument("--topk", type=int, default=-1, help="Visualizing top-k predictions.")
-    parser.add_argument("--class-names", type=str, nargs="*", default=None, help="Class names to visualize.")
+    parser.add_argument(
+        "--class-names", "--classes", type=str, nargs="*", default=None, help="Class names to visualize."
+    )
+    parser.add_argument("--phrases", type=str, nargs="*", default=None, help="Phrases to visualize.")
     parser.add_argument("--int-instance-id", action="store_true", help="Use integer instance id.")
     return parser.parse_args()
 
@@ -300,6 +314,7 @@ def main():
                     confidence_threshold=args.confidence_threshold,
                     topk=args.topk,
                     class_names=set(args.class_names) if args.class_names is not None else None,
+                    phrases=set(args.phrases) if args.phrases is not None else None,
                 )
 
 
