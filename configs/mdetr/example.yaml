@@ -2,4 +2,4 @@ python: /path/to/python
 project_root: /path/to/project
 batch_size: 16
 name: default
-prediction_dir: ./result/mdetr/${.name}
+prediction_dir: ${result_dir}/mdetr/${.name}

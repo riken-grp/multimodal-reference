@@ -11,9 +11,10 @@ defaults:
 scenario_ids: []
 id_file: null
 
-dataset_dir: /path/to/dataset
-gold_knp_dir: /path/to/gold/knp/file
-gold_annotation_dir: /path/to/gold/annotation
+result_dir: ./result
+dataset_dir: ./data/dataset
+gold_knp_dir: ./data/knp
+gold_annotation_dir: ./data/image_text_annotation
 
 phrase_grounding_model: glip  # mdetr, glip, detic
 coref_relax_mode: null  # null, pred, gold

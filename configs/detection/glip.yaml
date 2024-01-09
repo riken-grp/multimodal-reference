@@ -4,7 +4,7 @@ cfg:
   python: /path/to/python
   name: glip
   recording_dir: ./data/recording
-  prediction_dir: ./result/detection/${.name}
+  prediction_dir: ${result_dir}/detection/${.name}
 
   exp_name: <glip-exp-name>
   checkpoint: /path/to/checkpoint
