@@ -4,18 +4,25 @@ import shutil
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Optional, Union
 
-from rhoknp import KWJA, Document, Jumanpp
+from rhoknp import KNP, Jumanpp
 from rhoknp import Sentence as KNPSentence
+from tqdm import tqdm
 
 from utils.annotation import (
     BoundingBox,
     ImageAnnotation,
     ImageTextAnnotation,
+    Phrase2ObjectRelation,
+    PhraseAnnotation,
     UtteranceAnnotation,
 )
 from utils.util import CamelCaseDataClassJsonMixin, DatasetInfo, ImageInfo, Rectangle, UtteranceInfo
+
+jumanpp = Jumanpp()
+knp = KNP(options=["-tab", "-dpnd-fast"])
+# kwja = KWJA(options=["--tasks", "word", "--model-size", "large", "--input-format", "jumanpp"])
 
 
 @dataclass(frozen=True)
@@ -29,7 +36,7 @@ class BndBox(CamelCaseDataClassJsonMixin):
 @dataclass(frozen=True)
 class Obj(CamelCaseDataClassJsonMixin):
     name: str
-    bndbox: BndBox
+    bndbox: Optional[BndBox]
 
 
 @dataclass(frozen=True)
@@ -56,7 +63,7 @@ class Annotation(CamelCaseDataClassJsonMixin):
         depth = int(size.find("depth").text)  # type: ignore
         objects = []
         for obj in xml.findall("object"):
-            name = obj.find("name").text  # type: ignore
+            name: str = obj.find("name").text  # type: ignore
             if (bndbox := obj.find("bndbox")) is not None:
                 xmin = int(bndbox.find("xmin").text)  # type: ignore
                 ymin = int(bndbox.find("ymin").text)  # type: ignore
@@ -65,6 +72,7 @@ class Annotation(CamelCaseDataClassJsonMixin):
                 objects.append(Obj(name=name, bndbox=BndBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax)))  # type: ignore
             else:
                 assert obj.find("nobndbox") is not None
+                objects.append(Obj(name=name, bndbox=None))
         return cls(filename=filename, size=Size(width=width, height=height, depth=depth), objects=objects)
 
 
@@ -167,7 +175,7 @@ def main():
     annotation_dir = Path(args.annotation_dir)
     annotation_dir.mkdir(exist_ok=True)
 
-    for flickr_image_id in ids:
+    for flickr_image_id in tqdm(ids):
         flickr_annotation_file = flickr_annotations_dir / f"{flickr_image_id}.xml"
         flickr_sentences_file = flickr_sentences_dir / f"{flickr_image_id}.txt"
         flickr_annotation = Annotation.from_xml(ET.parse(flickr_annotation_file).getroot())
@@ -196,9 +204,31 @@ def convert_flickr(
     annotation_dir: Path,
     knp_dir: Path,
 ) -> None:
+    instance_id_to_class_name = {}
+    for flickr_sentence in flickr_sentences:
+        for phrase in flickr_sentence.phrases:
+            instance_id_to_class_name[str(phrase.phrase_id)] = phrase.phrase_type
+    instance_id_to_bounding_box = {
+        obj.name: BoundingBox(
+            image_id=flickr_image_id,
+            instance_id=obj.name,
+            rect=Rectangle(
+                x1=obj.bndbox.xmin,
+                y1=obj.bndbox.ymin,
+                x2=obj.bndbox.xmax,
+                y2=obj.bndbox.ymax,
+            ),
+            class_name=instance_id_to_class_name.get(obj.name, ""),  # Some objects are not referred in the sentence
+        )
+        if obj.bndbox is not None
+        else None
+        for obj in flickr_annotation.objects
+    }
+
     for idx, flickr_sentence in enumerate(flickr_sentences):
         scenario_id = f"{flickr_image_id}{idx:02d}"
         image_dir: Path = dataset_dir / scenario_id / "images"
+        image_dir.mkdir(parents=True, exist_ok=True)
         dataset_info = DatasetInfo(
             scenario_id=scenario_id,
             utterances=[
@@ -222,14 +252,18 @@ def convert_flickr(
         )
         dataset_dir.joinpath(scenario_id, "info.json").write_text(dataset_info.to_json(ensure_ascii=False, indent=2))
 
-        jumanpp = Jumanpp()
-        kwja = KWJA(options=["--tasks", "word", "--model-size", "large", "--input-format", "jumanpp"])
         morphemes = []
+        phrase_to_morpheme_global_indices = {}
         cursor = 0
         for phrase in flickr_sentence.phrases:
             chunk = flickr_sentence.text[cursor : phrase.span[0]]
-            morphemes += jumanpp.apply_to_sentence(chunk).morphemes
-            morphemes += jumanpp.apply_to_sentence(phrase.text).morphemes
+            if chunk:
+                morphemes += jumanpp.apply_to_sentence(chunk).morphemes
+            sent = jumanpp.apply_to_sentence(phrase.text)
+            phrase_to_morpheme_global_indices[phrase] = list(
+                range(len(morphemes), len(morphemes) + len(sent.morphemes))
+            )
+            morphemes += sent.morphemes
             cursor = phrase.span[1]
         if flickr_sentence.text[cursor:]:
             morphemes += jumanpp.apply_to_sentence(flickr_sentence.text[cursor:]).morphemes
@@ -237,37 +271,39 @@ def convert_flickr(
         knp_sentence.morphemes = morphemes
         knp_sentence.sent_id = f"{scenario_id}-00"
         knp_sentence.doc_id = scenario_id
-        knp_sentence = kwja.apply_to_document(Document.from_sentences([knp_sentence]))
+        # knp_sentence = kwja.apply_to_document(Document.from_sentences([knp_sentence]))
+        knp_sentence = knp.apply_to_sentence(knp_sentence)
+        for morpheme in knp_sentence.morphemes:
+            morpheme.semantics.clear()
+            morpheme.semantics.nil = True
+            morpheme.features.clear()
+        for knp_phrase in knp_sentence.phrases:
+            knp_phrase.features.clear()
         knp_dir.joinpath(f"{scenario_id}.knp").write_text(knp_sentence.to_knp())
 
-        instance_id_to_class_name: dict[str, str] = {}
+        instance_ids: list[str] = []
         for phrase in flickr_sentence.phrases:
-            instance_id_to_class_name[str(phrase.phrase_id)] = phrase.phrase_type
-
+            instance_id = str(phrase.phrase_id)
+            if instance_id not in instance_ids:
+                instance_ids.append(instance_id)
+        phrases: list[PhraseAnnotation] = [
+            PhraseAnnotation(text=base_phrase.text, relations=[]) for base_phrase in knp_sentence.base_phrases
+        ]
+        # タグを構成する形態素を含む基本句のうち最も後ろにある基本句をタグとして採用
+        for phrase, morpheme_global_indices in phrase_to_morpheme_global_indices.items():
+            last_morpheme = knp_sentence.morphemes[morpheme_global_indices[-1]]
+            phrase_annotation = phrases[last_morpheme.base_phrase.global_index]
+            phrase_annotation.relations.append(Phrase2ObjectRelation(type="=", instance_id=str(phrase.phrase_id)))
         image_text_annotation = ImageTextAnnotation(
             scenario_id=scenario_id,
-            utterances=[
-                UtteranceAnnotation(
-                    text=flickr_sentence.text,
-                    phrases=[],  # TODO
-                )
-            ],
+            utterances=[UtteranceAnnotation(text=flickr_sentence.text, phrases=phrases)],
             images=[
                 ImageAnnotation(
                     image_id=flickr_image_id,
                     bounding_boxes=[
-                        BoundingBox(
-                            image_id=flickr_image_id,
-                            instance_id=obj.name,
-                            rect=Rectangle(
-                                x1=obj.bndbox.xmin,
-                                y1=obj.bndbox.ymin,
-                                x2=obj.bndbox.xmax,
-                                y2=obj.bndbox.ymax,
-                            ),
-                            class_name=instance_id_to_class_name[obj.name],
-                        )
-                        for obj in flickr_annotation.objects
+                        instance_id_to_bounding_box[instance_id]  # type: ignore
+                        for instance_id in instance_ids
+                        if instance_id_to_bounding_box.get(instance_id) is not None
                     ],
                 )
             ],
