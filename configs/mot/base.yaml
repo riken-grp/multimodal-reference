@@ -1,4 +1,4 @@
 name: base-${.detection.cfg.name}  # mot task depends on detection task
 recording_dir: ./data/recording
-prediction_dir: ./result/mot/${.name}
+prediction_dir: ${result_dir}/mot/${.name}
 detection: ${detection}
