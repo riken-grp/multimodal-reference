@@ -240,7 +240,7 @@ def convert_flickr(
             utterances=[
                 UtteranceInfo(
                     text=flickr_sentence.text,
-                    sids=[f"{flickr_image_id}{idx:02d}"],
+                    sids=[f"{flickr_image_id}{idx:02d}-00"],
                     start=0,
                     end=1,
                     duration=1,
