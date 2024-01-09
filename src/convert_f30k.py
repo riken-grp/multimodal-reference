@@ -155,27 +155,31 @@ class Sentence:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--id-file", type=Path, help="Path to Flickr30k ID file.")
+    parser.add_argument("--flickr-id-file", type=Path, help="Path to Flickr30k ID file.")
     parser.add_argument("--flickr-image-dir", type=str, help="Path to flickr image directory.")
     parser.add_argument("--flickr-annotations-dir", type=str, help="Path to flickr Annotations directory.")
     parser.add_argument("--flickr-sentences-dir", type=str, help="Path to flickr Sentences directory.")
     parser.add_argument("--dataset-dir", "-d", type=str, help="Path to dataset directory.")
-    parser.add_argument("--knp-dir", "-k", type=Path, help="Path to knp directory.")
+    parser.add_argument("--knp-dir", "-k", type=str, help="Path to knp directory.")
     parser.add_argument("--annotation-dir", "-a", type=str, help="Path to annotation directory.")
+    parser.add_argument("--id-dir", type=str, help="Path to annotation directory.")
     args = parser.parse_args()
 
-    ids = args.id_file.read_text().splitlines()
+    flickr_ids = args.flickr_id_file.read_text().splitlines()
     flickr_image_dir = Path(args.flickr_image_dir)
     flickr_annotations_dir = Path(args.flickr_annotations_dir)
     flickr_sentences_dir = Path(args.flickr_sentences_dir)
     dataset_dir = Path(args.dataset_dir)
     dataset_dir.mkdir(exist_ok=True)
-    knp_dir: Path = args.knp_dir
+    knp_dir = Path(args.knp_dir)
     knp_dir.mkdir(exist_ok=True)
     annotation_dir = Path(args.annotation_dir)
     annotation_dir.mkdir(exist_ok=True)
+    id_dir = Path(args.id_dir)
+    id_dir.mkdir(exist_ok=True)
 
-    for flickr_image_id in tqdm(ids):
+    scenario_ids: list[str] = []
+    for flickr_image_id in tqdm(flickr_ids):
         flickr_annotation_file = flickr_annotations_dir / f"{flickr_image_id}.xml"
         flickr_sentences_file = flickr_sentences_dir / f"{flickr_image_id}.txt"
         flickr_annotation = Annotation.from_xml(ET.parse(flickr_annotation_file).getroot())
@@ -184,7 +188,7 @@ def main():
             sentence = Sentence.from_string(flickr_sentence)
             assert flickr_sentence == sentence.to_string()
             flickr_sentences.append(sentence)
-        convert_flickr(
+        scenario_ids += convert_flickr(
             f"{int(flickr_image_id):010d}",
             flickr_annotation,
             flickr_sentences,
@@ -193,6 +197,7 @@ def main():
             annotation_dir,
             knp_dir,
         )
+    id_dir.joinpath(args.flickr_id_file.name).write_text("\n".join(scenario_ids) + "\n")
 
 
 def convert_flickr(
@@ -203,7 +208,8 @@ def convert_flickr(
     dataset_dir: Path,
     annotation_dir: Path,
     knp_dir: Path,
-) -> None:
+) -> list[str]:
+    scenario_ids: list[str] = []
     instance_id_to_class_name = {}
     for flickr_sentence in flickr_sentences:
         for phrase in flickr_sentence.phrases:
@@ -312,6 +318,9 @@ def convert_flickr(
             image_text_annotation.to_json(ensure_ascii=False, indent=2)
         )
         shutil.copy(flickr_image_dir / flickr_annotation.filename, image_dir / f"{flickr_image_id}.jpg")
+        scenario_ids.append(scenario_id)
+
+    return scenario_ids
 
 
 if __name__ == "__main__":
