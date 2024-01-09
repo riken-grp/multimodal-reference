@@ -39,7 +39,7 @@ class MultimodalReference(luigi.Task):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.dataset_dir = Path(self.cfg.dataset_dir) / self.scenario_id
-        self.exp_dir = Path(self.cfg.exp_dir)
+        self.prediction_dir = Path(self.cfg.prediction_dir)
         self.gold_document_path = Path(self.cfg.gold_knp_dir) / f"{self.scenario_id}.knp"
 
     def requires(self) -> dict[str, luigi.Task]:
@@ -59,7 +59,7 @@ class MultimodalReference(luigi.Task):
         return tasks
 
     def output(self) -> luigi.LocalTarget:
-        return luigi.LocalTarget(self.exp_dir.joinpath(f"{self.scenario_id}.json"))
+        return luigi.LocalTarget(self.prediction_dir.joinpath(f"{self.scenario_id}.json"))
 
     def complete(self) -> bool:
         if not Path(self.output().path).exists():

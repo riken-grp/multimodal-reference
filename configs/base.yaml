@@ -9,7 +9,6 @@ work_dir: ${hydra:runtime.cwd}
 # should be used along with experiment mode
 name: default
 
-exp_dir: ${work_dir}/result/mmref/${name}
 config_name: ${hydra:job.config_name}
 
 luigi:
@@ -21,8 +20,8 @@ hydra:
   output_subdir: null
   # hydra_logging: null
   # job_logging: null
-  run:
-    dir: ${exp_dir}
+  # run:
+  #   dir: ${exp_dir}
   # sweep:
   #   dir: ${work_dir}/multirun_result
   #   subdir: ${name}-${hydra:job.num}
@@ -35,7 +34,6 @@ hydra:
         exclude_keys:
           - work_dir
           - name
-          - exp_dir
           - luigi.local_scheduler
           - luigi.workers
           - luigi.log_level
