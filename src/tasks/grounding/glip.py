@@ -34,7 +34,7 @@ class GLIPPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
         super(luigi.Task, self).__init__(
             available_gpus, Path("shared_state.json"), state_prefix=f"{socket.gethostname()}_gpu"
         )
-        Path(self.cfg.prediction_dir).mkdir(exist_ok=True)
+        Path(self.cfg.prediction_dir).mkdir(parents=True, exist_ok=True)
 
     def output(self):
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
