@@ -53,8 +53,8 @@ def main():
 
     tagged_images = []
     frames = []
+    frame: np.ndarray  # (h, w, 3), BGR
     for idx, frame in enumerate(frame_from_video(video)):
-        frame: np.ndarray  # (h, w, 3)
         if idx >= len(detic_dump):
             break
         raw_bbs: np.ndarray = detic_dump[idx]  # (bb, 6), the 2nd axis: (x1, y1, x2, y2, confidence, class_id)
