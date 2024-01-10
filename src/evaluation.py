@@ -299,7 +299,7 @@ class MMRefEvaluator:
                         gold_bounding_box.rect.cx,
                         gold_bounding_box.rect.cy,
                         base_phrase.head.pos,
-                        base_phrase.head.subpos,
+                        base_phrase.head.subpos if base_phrase.head.text != "物" else "形式名詞",
                     )
                     pred_bounding_boxes: list[BoundingBoxPrediction] = sorted(
                         {rel.bounding_box for rel in pred_relations if rel.type == relation_type},
@@ -340,7 +340,7 @@ class MMRefEvaluator:
                         pred_rect.cx,
                         pred_rect.cy,
                         base_phrase.head.pos,
-                        base_phrase.head.subpos,
+                        base_phrase.head.subpos if base_phrase.head.text != "物" else "形式名詞",
                     )
                     rects = [
                         (pred_relation.bounding_box.confidence, box_iou(gold_bounding_box.rect, pred_rect))
