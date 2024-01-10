@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from boxmot import StrongSORT
 
-from utils.mot import BoundingBox, DetectionLabels, Frame
+from utils.mot import BoundingBox, DetectionLabels, Frame, frame_from_video
 from utils.util import Rectangle
 
 
@@ -20,15 +20,6 @@ def parse_args():
     parser.add_argument("--output-json", default=None, help="Output json file", type=Path)
     parser.add_argument("--detic-dump", default=None, help="Detic detection result pickle dump file", type=str)
     return parser.parse_args()
-
-
-def frame_from_video(video):
-    while video.isOpened():
-        success, frame = video.read()
-        if success:
-            yield frame
-        else:
-            break
 
 
 def main():

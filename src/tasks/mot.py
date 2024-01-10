@@ -15,7 +15,7 @@ from omegaconf import DictConfig
 from typing_extensions import TypeAlias
 
 from tasks.util import FileBasedResourceManagerMixin
-from utils.mot import BoundingBox, DetectionLabels, Frame
+from utils.mot import BoundingBox, DetectionLabels, Frame, frame_from_video
 from utils.util import Rectangle
 
 Tracker: TypeAlias = Union[BoTSORT, StrongSORT, HybridSORT, DeepOCSORT, OCSORT, BYTETracker]
@@ -75,15 +75,6 @@ class MultipleObjectTracking(luigi.Task, FileBasedResourceManagerMixin[int]):
                 f.write(detection_labels.to_json(ensure_ascii=False, indent=2))
         finally:
             self.release_resource(gpu_id)
-
-
-def frame_from_video(video: cv2.VideoCapture):
-    while video.isOpened():
-        success, frame = video.read()
-        if success:
-            yield frame
-        else:
-            break
 
 
 def run_tracker(
