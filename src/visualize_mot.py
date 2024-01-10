@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 from utils.annotation import ImageTextAnnotation
-from utils.mot import BoundingBox, DetectionLabels, frame_from_video
+from utils.mot import DetectionLabels, frame_from_video
 from utils.util import box_iou
 
 
@@ -28,7 +28,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     args = parse_args()
     output_dir: Path = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -53,7 +53,6 @@ def main():
         tagged_images = []
         frame: np.ndarray  # (h, w, 3), BGR
         for frame, frame_prediction in zip(frame_from_video(video), pred_mot.frames):
-            bounding_box: BoundingBox
             for bounding_box in frame_prediction.bounding_boxes:
                 if bounding_box.instance_id in instance_ids:
                     box_color = (150, 50, 255)  # BGR
@@ -81,7 +80,7 @@ def main():
         fourcc: int = cv2.VideoWriter_fourcc(*"xvid")
         w = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        writer = cv2.VideoWriter(str(output_dir / scenario_id), fourcc, 30.0, (w, h))
+        writer = cv2.VideoWriter(str(output_dir / f"{scenario_id}.mp4"), fourcc, 30.0, (w, h))
         for img in tagged_images:
             writer.write(img)
 
