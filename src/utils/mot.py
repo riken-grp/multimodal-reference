@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+import cv2
+
 from utils.util import CamelCaseDataClassJsonMixin, Rectangle
 
 
@@ -21,3 +23,12 @@ class Frame(CamelCaseDataClassJsonMixin):
 class DetectionLabels(CamelCaseDataClassJsonMixin):
     frames: list[Frame]
     class_names: list[str]
+
+
+def frame_from_video(video: cv2.VideoCapture):
+    while video.isOpened():
+        success, frame = video.read()
+        if success:
+            yield frame
+        else:
+            break
