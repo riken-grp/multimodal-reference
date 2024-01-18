@@ -20,8 +20,8 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies:
-          - rhoknp==1.6.0
-          - cohesion-tools==0.7.2
+          - rhoknp==1.7.0
+          - cohesion-tools==0.7.3
           - polars==0.19.19
           - dataclasses-json
           - omegaconf
