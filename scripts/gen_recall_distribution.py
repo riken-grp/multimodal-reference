@@ -2,6 +2,7 @@ import argparse
 import io
 import subprocess
 import sys
+from itertools import chain
 from pathlib import Path
 
 import plotly.express as px
@@ -19,7 +20,7 @@ def main() -> None:
         "--id-file", type=Path, nargs="+", default=[Path("data/id/test.id")], help="Paths to scenario id file"
     )
     args = parser.parse_args()
-    scenario_ids: list[str] = sum((path.read_text().splitlines() for path in args.id_file), [])
+    scenario_ids: list[str] = list(chain.from_iterable(path.read_text().splitlines() for path in args.id_file))
     output = subprocess.run(
         (
             f"{sys.executable} src/evaluation.py -p result/mmref/{args.exp_name} --scenario-ids {' '.join(scenario_ids)}"

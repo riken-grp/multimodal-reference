@@ -2,6 +2,7 @@ import argparse
 import subprocess
 import sys
 import tempfile
+from itertools import chain
 from pathlib import Path
 
 import plotly.express as px
@@ -18,7 +19,7 @@ def main() -> None:
         "--id-file", type=Path, nargs="+", default=[Path("data/id/test.id")], help="Paths to scenario id file"
     )
     args = parser.parse_args()
-    scenario_ids: list[str] = sum((path.read_text().splitlines() for path in args.id_file), [])
+    scenario_ids: list[str] = list(chain.from_iterable(path.read_text().splitlines() for path in args.id_file))
     for exp_name in args.exp_names:
         with tempfile.TemporaryDirectory() as out_dir:
             command = (

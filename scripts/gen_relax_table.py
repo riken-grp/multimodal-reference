@@ -3,6 +3,7 @@ import io
 import subprocess
 import sys
 from dataclasses import dataclass
+from itertools import chain
 from pathlib import Path
 from typing import Optional
 
@@ -75,7 +76,7 @@ def main():
     )
     parser.add_argument("--include-precision", action="store_true", help="Include precision in the table.")
     args = parser.parse_args()
-    scenario_ids: list[str] = sum((path.read_text().splitlines() for path in args.id_file), [])
+    scenario_ids: list[str] = list(chain.from_iterable(path.read_text().splitlines() for path in args.id_file))
     exp_configs = gen_relax_comparison_profile("glip", args.glip_name, args.mot_name)
     data: dict[ExpConfig, list[str]] = {config: [] for config in exp_configs}
     for exp_config in exp_configs:
