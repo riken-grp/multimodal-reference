@@ -1,6 +1,7 @@
 import os
 import socket
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Annotated
@@ -42,6 +43,9 @@ class CohesionAnalysis(luigi.Task, FileBasedResourceManagerMixin[int]):
             prediction = self._run_cohesion(document=Document.from_knp(input_knp_file.read_text()), env=env)
             with self.output().open(mode="w") as f:
                 f.write(prediction.to_knp())
+        except subprocess.CalledProcessError as e:
+            print(e.stderr, file=sys.stderr)
+            raise e
         finally:
             self.release_resource(gpu_id)
 

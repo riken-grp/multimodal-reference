@@ -2,6 +2,7 @@ import math
 import os
 import socket
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Annotated
@@ -53,6 +54,9 @@ class GLIPPhraseGrounding(luigi.Task, FileBasedResourceManagerMixin[int]):
             )
             with self.output().open(mode="w") as f:
                 f.write(prediction.to_json(ensure_ascii=False, indent=2))
+        except subprocess.CalledProcessError as e:
+            print(e.stderr, file=sys.stderr)
+            raise e
         finally:
             self.release_resource(gpu_id)
 
