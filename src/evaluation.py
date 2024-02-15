@@ -20,7 +20,7 @@ from utils.constants import CASES, RELATION_TYPES_ALL
 from utils.mot import DetectionLabels
 from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import PhraseGroundingPrediction
-from utils.util import DatasetInfo, IdMapper, Rectangle, box_iou
+from utils.util import DatasetInfo, IdMapper, Rectangle, UtteranceInfo, box_iou, image_id_to_msec
 
 
 class MMRefEvaluator:
@@ -219,6 +219,7 @@ class MMRefEvaluator:
                     "center_y": key[10],
                     "pos": key[11],
                     "subpos": key[12],
+                    "temporal_location": key[13],
                     "recall_total": metrics.get("recall_total", 0),
                     "precision_pos": metrics.get("precision_pos", 0),
                     "precision_total": metrics.get("precision_total", 0),
@@ -244,6 +245,7 @@ class MMRefEvaluator:
         image_id_to_annotation: dict[str, ImageAnnotation] = {image.image_id: image for image in self.image_annotations}
         assert len(self.dataset_info.utterances) == len(self.utterance_annotations) == len(prediction.utterances)
         all_image_ids = [image.id for image in self.dataset_info.images]
+        utterance: UtteranceInfo
         for idx, (utterance, utterance_annotation, utterance_prediction) in enumerate(
             zip(self.dataset_info.utterances, self.utterance_annotations, prediction.utterances)
         ):
@@ -286,6 +288,15 @@ class MMRefEvaluator:
                     # 領域矩形は評価から除外
                     if gold_bounding_box.class_name == "region":
                         continue
+                    frame_msec = image_id_to_msec(image_id)
+                    if utterance.start <= frame_msec < (utterance.start + utterance.end) / 2:
+                        temporal_location = "first_half"
+                    elif (utterance.start + utterance.end) / 2 <= frame_msec < utterance.end:
+                        temporal_location = "second_half"
+                    elif utterance.end <= frame_msec:
+                        temporal_location = "after"
+                    else:
+                        raise ValueError(f"Unknown temporal location: {frame_msec} for utterance {utterance}")
                     key = (
                         image_id,
                         f"{utterance.speaker}_{idx:02}",
@@ -300,6 +311,7 @@ class MMRefEvaluator:
                         gold_bounding_box.rect.cy,
                         base_phrase.head.pos,
                         base_phrase.head.subpos if base_phrase.head.text != "物" else "形式名詞",
+                        temporal_location,
                     )
                     pred_bounding_boxes: list[BoundingBoxPrediction] = sorted(
                         {rel.bounding_box for rel in pred_relations if rel.type == relation_type},
@@ -327,6 +339,15 @@ class MMRefEvaluator:
                             and instance_id_to_bounding_box[rel.instance_id].class_name != "region"
                         )
                     ]
+                    frame_msec = image_id_to_msec(image_id)
+                    if utterance.start <= frame_msec < (utterance.start + utterance.end) / 2:
+                        temporal_location = "first_half"
+                    elif (utterance.start + utterance.end) / 2 <= frame_msec < utterance.end:
+                        temporal_location = "second_half"
+                    elif utterance.end <= frame_msec:
+                        temporal_location = "after"
+                    else:
+                        raise ValueError(f"Unknown temporal location: {frame_msec} for utterance {utterance}")
                     key = (
                         image_id,
                         f"{utterance.speaker}_{idx:02}",
@@ -341,6 +362,7 @@ class MMRefEvaluator:
                         pred_rect.cy,
                         base_phrase.head.pos,
                         base_phrase.head.subpos if base_phrase.head.text != "物" else "形式名詞",
+                        temporal_location,
                     )
                     rects = [
                         (pred_relation.bounding_box.confidence, box_iou(gold_bounding_box.rect, pred_rect))
@@ -400,7 +422,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=["rel"],
         nargs="+",
-        choices=["rel", "class", "size", "noun", "text", "mot", "detection"],
+        choices=["rel", "class", "size", "noun", "temporal", "text", "mot", "detection"],
         help="Evaluation modes.",
     )
     parser.add_argument(
@@ -434,7 +456,7 @@ def main() -> None:
             eval_results["detection"] += evaluator.eval_object_detection(
                 pred_detection, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
             )
-        if set(args.eval_modes) & {"rel", "class", "size", "noun"}:
+        if set(args.eval_modes) & {"rel", "class", "size", "noun", "temporal"}:
             prediction = PhraseGroundingPrediction.from_json(
                 args.prediction_mmref_dir.joinpath(f"{scenario_id}.json").read_text()
             )
@@ -457,7 +479,7 @@ def main() -> None:
         )
         print(df_to_string(pl.from_pandas(summary.tail(1)), args.format))
 
-    if set(args.eval_modes) & {"rel", "class", "size", "noun"}:
+    if set(args.eval_modes) & {"rel", "class", "size", "noun", "temporal"}:
         mmref_result_df = pl.DataFrame(eval_results["mmref"])
         if args.raw_result_csv is not None:
             mmref_result_df.write_csv(args.raw_result_csv)
@@ -473,6 +495,9 @@ def main() -> None:
 
         if "noun" in args.eval_modes:
             print_noun_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
+
+        if "temporal" in args.eval_modes:
+            print_temporal_table(mmref_result_df, args.recall_topk, args.column_prefixes, args.format)
 
     if "detection" in args.eval_modes:
         detection_result_df = pl.DataFrame(eval_results["detection"])
@@ -612,6 +637,38 @@ def print_noun_table(
     mmref_result_df = mmref_result_df.filter(pl.col("rel_type") == "=")
     df_class = (
         mmref_result_df.group_by(["pos", "subpos"], maintain_order=True)
+        .sum()
+        .drop(
+            [
+                "scenario_id",
+                "image_id",
+                "utterance_id",
+                "sid",
+                "base_phrase_index",
+                "rel_type",
+                "instance_id_or_pred_idx",
+            ]
+        )
+    )
+    new_columns = [(df_class["precision_pos"] / df_class["precision_total"]).alias("precision")]
+    for recall_top_k in recall_top_ks:
+        metric_suffix = f"@{recall_top_k}" if recall_top_k >= 0 else ""
+        new_columns.append(
+            (df_class["recall_pos" + metric_suffix] / df_class["recall_total"]).alias("recall" + metric_suffix)
+        )
+    df_class = df_class.with_columns(new_columns)
+    print(df_to_string(df_class, format_, column_prefixes))
+
+
+def print_temporal_table(
+    mmref_result_df: pl.DataFrame,
+    recall_top_ks: list[int],
+    column_prefixes: list[str],
+    format_: str = "repr",
+) -> None:
+    mmref_result_df = mmref_result_df.filter(pl.col("rel_type") == "=")
+    df_class = (
+        mmref_result_df.group_by(["temporal_location"], maintain_order=True)
         .sum()
         .drop(
             [
