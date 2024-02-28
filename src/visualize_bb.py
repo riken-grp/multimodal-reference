@@ -54,6 +54,30 @@ def get_core_expression(unit: Union[BasePhrase]) -> tuple[str, str, str]:
     )
 
 
+def box_iou(box1: Bbox, box2: Bbox) -> float:
+    intersection = Bbox.intersection(box1, box2)
+    if intersection is None:
+        return 0
+    intersection_area = intersection.width * intersection.height
+    box1_area = box1.width * box1.height
+    box2_area = box2.width * box2.height
+    union_area = box1_area + box2_area - intersection_area
+    if union_area == 0:
+        return 0
+    return intersection_area / union_area
+
+
+def box_io1(box1: Bbox, box2: Bbox) -> float:
+    intersection = Bbox.intersection(box1, box2)
+    if intersection is None:
+        return 0
+    intersection_area = intersection.width * intersection.height
+    box1_area = box1.width * box1.height
+    if box1_area == 0:
+        return 0
+    return intersection_area / box1_area
+
+
 def plot_results(
     image: ImageFile,
     image_annotation: ImageAnnotation,
@@ -92,32 +116,45 @@ def plot_results(
             base_phrases, phrase_annotations, image_annotation, relation_types, class_names, phrases, id_mapper
         )
 
-    drawn_bbs: set[Bbox] = set()
+    drawn_object_bbs: list[Bbox] = []
     for labeled_rectangle in labeled_rectangles:
         rect = labeled_rectangle.rect
-        ax.add_patch(
-            plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, fill=False, color=labeled_rectangle.color, linewidth=3)
+        object_rectangle = plt.Rectangle(
+            (rect.x1, rect.y1), rect.w, rect.h, fill=False, color=labeled_rectangle.color, linewidth=3
         )
+        ax.add_patch(object_rectangle)
+        drawn_object_bbs.append(object_rectangle.get_bbox())
+
+    drawn_label_bbs: set[Bbox] = set()
+    for labeled_rectangle, object_bbox in zip(labeled_rectangles, drawn_object_bbs):
+        rect = labeled_rectangle.rect
         text_box = ax.text(
             rect.x1,
-            rect.y1,
+            rect.y1 - 25,
             labeled_rectangle.label,
             fontsize=24,
             bbox=dict(facecolor=labeled_rectangle.color, alpha=0.8),
             fontname="Hiragino Maru Gothic Pro",
         )
         fig.canvas.draw()
-        bbox_window = text_box.get_window_extent()
-        bbox = bbox_window.transformed(ax.transData.inverted())
-        bbox = Bbox.from_bounds(bbox.x0, bbox.y0, bbox_window.width, bbox_window.height)
+        label_bbox_window = text_box.get_window_extent()
+        label_bbox = label_bbox_window.transformed(ax.transData.inverted())
+        label_bbox = Bbox.from_bounds(label_bbox.x0, label_bbox.y0, label_bbox_window.width, label_bbox_window.height)
+
+        stride = 10
+        count = 0
+        while any(box_io1(bb, label_bbox) >= 0.45 for bb in drawn_object_bbs if bb != object_bbox) and count < 20:
+            text_box.set_x(text_box.get_position()[0] - stride)
+            label_bbox = Bbox.from_bounds(label_bbox.x0 - stride, label_bbox.y0, label_bbox.width, label_bbox.height)
+            count += 1
 
         count = 0
-        stride = 10
-        while any(Bbox.intersection(bb, bbox) is not None for bb in drawn_bbs) and count < 50:
+        while any(box_iou(bb, label_bbox) >= 0.1 for bb in drawn_label_bbs) and count < 50:
             text_box.set_y(text_box.get_position()[1] - stride)
-            bbox = Bbox.from_bounds(bbox.x0, bbox.y0 - stride, bbox.width, bbox.height)
+            label_bbox = Bbox.from_bounds(label_bbox.x0, label_bbox.y0 - stride, label_bbox.width, label_bbox.height)
             count += 1
-        drawn_bbs.add(bbox)
+
+        drawn_label_bbs.add(label_bbox)
 
     ax.text(
         -10,
