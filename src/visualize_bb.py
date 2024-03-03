@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import math
+import random
 import sys
 from dataclasses import dataclass
 from itertools import cycle, repeat
@@ -119,9 +120,10 @@ def plot_results(
     drawn_object_bbs: list[Bbox] = []
     for labeled_rectangle in labeled_rectangles:
         rect = labeled_rectangle.rect
-        object_rectangle = plt.Rectangle(
-            (rect.x1, rect.y1), rect.w, rect.h, fill=False, color=labeled_rectangle.color, linewidth=3
-        )
+        kwargs = dict(fill=False, color=labeled_rectangle.color, linewidth=3)
+        if labeled_rectangle.color == GOLD_COLOR:
+            kwargs["linestyle"] = "--"
+        object_rectangle = plt.Rectangle((rect.x1, rect.y1), rect.w, rect.h, **kwargs)
         ax.add_patch(object_rectangle)
         drawn_object_bbs.append(object_rectangle.get_bbox())
 
@@ -138,18 +140,17 @@ def plot_results(
         )
         fig.canvas.draw()
         label_bbox_window = text_box.get_window_extent()
-        label_bbox = label_bbox_window.transformed(ax.transData.inverted())
-        label_bbox = Bbox.from_bounds(label_bbox.x0, label_bbox.y0, label_bbox_window.width, label_bbox_window.height)
+        label_bbox = Bbox.from_bounds(rect.x1, rect.y1 - 70, label_bbox_window.width * 0.78, 70)
 
         stride = 10
         count = 0
-        while any(box_io1(bb, label_bbox) >= 0.45 for bb in drawn_object_bbs if bb != object_bbox) and count < 20:
+        while any(box_io1(bb, label_bbox) >= 0.1 for bb in drawn_object_bbs if bb != object_bbox) and count < 50:
             text_box.set_x(text_box.get_position()[0] - stride)
             label_bbox = Bbox.from_bounds(label_bbox.x0 - stride, label_bbox.y0, label_bbox.width, label_bbox.height)
             count += 1
 
         count = 0
-        while any(box_iou(bb, label_bbox) >= 0.1 for bb in drawn_label_bbs) and count < 50:
+        while any(box_iou(bb, label_bbox) > 0.0 for bb in drawn_label_bbs) and count < 50:
             text_box.set_y(text_box.get_position()[1] - stride)
             label_bbox = Bbox.from_bounds(label_bbox.x0, label_bbox.y0 - stride, label_bbox.width, label_bbox.height)
             count += 1
@@ -217,7 +218,10 @@ def draw_prediction(
     relation_types: set[str],
     phrases: Optional[set[str]],
 ) -> list[LabeledRectangle]:
-    colors = cycle(colormaps["tab20"].colors)
+    base_colors: list[tuple] = list(colormaps["tab20"].colors)
+    random.seed(0)
+    random.shuffle(base_colors)
+    colors = cycle(base_colors)
     ret = []
     for phrase_prediction in phrase_predictions:
         target_relation_types: set[str] = {relation.type for relation in phrase_prediction.relations} & relation_types
