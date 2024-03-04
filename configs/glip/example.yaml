@@ -1,0 +1,9 @@
+python: /path/to/python
+project_root: /path/to/project
+name: example
+exp_name: example
+checkpoint: ${glip.project_root}/OUTPUT/${glip.exp_name}/ft_task_1/model_0010186.pth
+config: ${glip.project_root}/OUTPUT/${glip.exp_name}/ft_task_1/config.yml
+prediction_dir: ${result_dir}/glip/${.name}
+num_utterances_in_window: 1
+no_query: false
