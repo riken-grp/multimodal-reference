@@ -8,6 +8,8 @@ defaults:
   - mot: example.yaml
   - _self_
 
+prediction_dir: ${result_dir}/mmref/${name}
+
 scenario_ids: []
 id_file: null
 
