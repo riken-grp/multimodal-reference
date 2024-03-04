@@ -16,38 +16,64 @@ poetry install
 
 ## Prepare Datasets
 
-1. Download the J-CRe3 dataset.
+1. Download the J-CRe3 annotations.
 
     ```shell
     git clone git@github.com:riken-grp/J-CRe3.git /somewhere/J-CRe3
     ```
 
-1. Place data files under `data` directory. You can use `cp -r` instead of `ln -s`.
+2. Download the video and audio files following [the instructions](https://github.com/riken-grp/J-CRe3?tab=readme-ov-file#video-and-audio-files) in J-CRe3.
+
+3. Place data files under `data` directory. You can use `cp -r` instead of `ln -s`.
 
     ```shell
     mkdir -p data
     ln -s /somewhere/J-CRe3/textual_annotations ./data/knp
     ln -s /somewhere/J-CRe3/visual_annotations ./data/image_text_annotation
     ln -s /somewhere/J-CRe3/id ./data/id
+    ln -s /somewhere/J-CRe3/recording ./data/recording
+    ln -s /somewhere/J-CRe3/recording ./data/dataset
    ```
-
-1. TBW
 
 ## Run Prediction
 
-- Make config files
+1. Make a config file for cohesion analysis.
 
-TBW
+  - Copy the example config file and modify it as needed.
 
-- Run `prediction_writer.py`.
+   ```shell
+   cp configs/cohesion/example.yaml configs/cohesion/default.yaml
+   ```
+   - Modify the `python`, `project_root`, and `checkpoint` fields in `configs/cohesion/default.yaml` as needed.
 
-```shell
-[AVAILABLE_GPUS=0,1,2,3] python src/prediction_writer.py -cn server \
-    phrase_grounding_model=glip \
-    glip=ft2_deberta_b24_u3s1_b48_1e \
-    id_file=<(cat data/id/test.id data/id/valid.id) \
-    luigi.workers=4
- ```
+2. Make a config file for phrase grounding by GLIP.
+
+  - Copy the example config file and modify it as needed.
+
+   ```shell
+   cp configs/glip/example.yaml configs/glip/ft2_deberta_b24_u3s1_b48_1e.yaml
+   ```
+   - Modify the `python`, `project_root`, `name`, `exp_name`, and `checkpoint` fields in `configs/glip/ft2_deberta_b24_u3s1_b48_1e.yaml` as needed.
+     The `name` field should be the same as the file name of the config file (`ft2_deberta_b24_u3s1_b48_1e`).
+
+3. Make a config file for prediction writer.
+
+  - Copy the example config file and modify it as needed.
+
+   ```shell
+   cp configs/example.yaml configs/default.yaml
+   ```
+   - Modify the `cohesion`, `glip`, and `checkpoint` fields in `configs/prediction_writer/default.yaml` as needed.
+
+4. Run `prediction_writer.py`.
+
+   ```shell
+   [AVAILABLE_GPUS=0,1,2,3] python src/prediction_writer.py -cn default \
+       phrase_grounding_model=glip \
+       glip=ft2_deberta_b24_u3s1_b48_1e \
+       id_file=<(cat data/id/test.id data/id/valid.id) \
+       luigi.workers=4
+    ```
 
 ## Run Evaluation
 
