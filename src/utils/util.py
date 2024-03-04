@@ -126,3 +126,11 @@ class IdMapper:
 
     def map(self, id_: object) -> int:
         return self[id_]
+
+
+def image_id_to_frame_index(image_id: str) -> int:
+    return (int(image_id) - 1) * 30
+
+
+def image_id_to_msec(image_id: str) -> int:
+    return (int(image_id) - 1) * 1000
