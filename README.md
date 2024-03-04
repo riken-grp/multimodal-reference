@@ -35,6 +35,22 @@ poetry install
     ln -s /somewhere/J-CRe3/recording ./data/dataset
    ```
 
+## Setup GLIP
+
+1. Follow the instructions in [nobu-g/GLIP](https://github.com/nobu-g/GLIP) to set up the GLIP environment. We recommend to use Poetry to install the dependencies.
+
+2. Download the checkpoint files under the GLIP root directory.
+
+    ```shell
+    cd /somewhere/GLIP
+    wget https://lotus.kuee.kyoto-u.ac.jp/~ueda/dist/GLIP/OUTPUT.zip
+    unzip OUTPUT.zip
+    ```
+
+## Setup cohesion analyzer
+
+TBW
+
 ## Run Prediction
 
 1. Make a config file for cohesion analysis.
