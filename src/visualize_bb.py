@@ -20,7 +20,6 @@ from utils.constants import RELATION_TYPES_ALL
 from utils.prediction import PhraseGroundingPrediction, PhrasePrediction
 from utils.util import DatasetInfo, IdMapper, Rectangle
 
-# GOLD_COLOR = (0.929, 0.694, 0.125)  # yellow
 GOLD_COLOR = (1.0, 1.0, 1.0)  # white
 
 
@@ -93,6 +92,7 @@ def plot_results(
     topk: int = -1,
     class_names: Optional[set[str]] = None,
     phrases: Optional[set[str]] = None,
+    hide_utterance: bool = False,
 ) -> None:
     fig = plt.figure(figsize=(16, 10))
     np_image = np.array(image)
@@ -140,31 +140,34 @@ def plot_results(
         )
         fig.canvas.draw()
         label_bbox_window = text_box.get_window_extent()
-        label_bbox = Bbox.from_bounds(rect.x1, rect.y1 - 70, label_bbox_window.width * 0.78, 70)
+        label_bbox = Bbox.from_bounds(
+            rect.x1, rect.y1 - 70, label_bbox_window.width * 0.78, 70 * len(labeled_rectangle.label.splitlines())
+        )
 
         stride = 10
+        count = 0
+        while any(box_iou(bb, label_bbox) >= 0.01 for bb in drawn_label_bbs) and count < 50:
+            text_box.set_y(text_box.get_position()[1] - stride)
+            label_bbox = Bbox.from_bounds(label_bbox.x0, label_bbox.y0 - stride, label_bbox.width, label_bbox.height)
+            count += 1
+
         count = 0
         while any(box_io1(bb, label_bbox) >= 0.1 for bb in drawn_object_bbs if bb != object_bbox) and count < 50:
             text_box.set_x(text_box.get_position()[0] - stride)
             label_bbox = Bbox.from_bounds(label_bbox.x0 - stride, label_bbox.y0, label_bbox.width, label_bbox.height)
             count += 1
 
-        count = 0
-        while any(box_iou(bb, label_bbox) > 0.0 for bb in drawn_label_bbs) and count < 50:
-            text_box.set_y(text_box.get_position()[1] - stride)
-            label_bbox = Bbox.from_bounds(label_bbox.x0, label_bbox.y0 - stride, label_bbox.width, label_bbox.height)
-            count += 1
-
         drawn_label_bbs.add(label_bbox)
 
-    ax.text(
-        -10,
-        -50,
-        "".join(bp.text for bp in base_phrases),
-        fontsize=24,
-        bbox=dict(facecolor=(1.0, 1.0, 1.0), alpha=0.8),
-        fontname="Hiragino Maru Gothic Pro",
-    )
+    if not hide_utterance:
+        ax.text(
+            -10,
+            -50,
+            "".join(bp.text for bp in base_phrases),
+            fontsize=24,
+            bbox=dict(facecolor=(1.0, 1.0, 1.0), alpha=0.8),
+            fontname="Hiragino Maru Gothic Pro",
+        )
 
     plt.imshow(np_image)
     plt.axis("off")
@@ -300,6 +303,7 @@ def parse_args():
     )
     parser.add_argument("--phrases", type=str, nargs="*", default=None, help="Phrases to visualize.")
     parser.add_argument("--int-instance-id", action="store_true", help="Use integer instance id.")
+    parser.add_argument("--hide-utterance", action="store_true", help="Hide utterance text.")
     return parser.parse_args()
 
 
@@ -356,6 +360,7 @@ def main():
                     topk=args.topk,
                     class_names=set(args.class_names) if args.class_names is not None else None,
                     phrases=set(args.phrases) if args.phrases is not None else None,
+                    hide_utterance=args.hide_utterance,
                 )
 
 
