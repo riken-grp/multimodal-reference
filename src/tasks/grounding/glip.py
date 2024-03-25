@@ -66,13 +66,17 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
     utterance_predictions: list[UtterancePrediction] = []
     sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in document.sentences}
     for idx, utterance in enumerate(dataset_info.utterances):
-        start_index = math.ceil(utterance.start / 1000)
+        if idx >= 1:
+            prev_utterance = dataset_info.utterances[idx - 1]
+            start_index = math.ceil(prev_utterance.end / 1000)
+        else:
+            start_index = 0
         if idx + 1 < len(dataset_info.utterances):
             next_utterance = dataset_info.utterances[idx + 1]
             end_index = math.ceil(next_utterance.start / 1000)
         else:
             end_index = len(dataset_info.images)
-        images_in_utterance = dataset_info.images[start_index:end_index]
+        corresponding_images = dataset_info.images[start_index:end_index]
         utterances_in_window = dataset_info.utterances[max(0, idx + 1 - cfg.num_utterances_in_window) : idx + 1]
         doc_window = Document.from_sentences(
             [sid2sentence[sid] for utterance in utterances_in_window for sid in utterance.sids]
@@ -103,14 +107,14 @@ def run_glip(cfg: DictConfig, dataset_dir: Path, document: Document, env: dict[s
                     f"--export-dir={out_dir}",
                     "--image-files",
                 ]
-                + [str(dataset_dir / image.path) for image in images_in_utterance],
+                + [str(dataset_dir / image.path) for image in corresponding_images],
                 check=True,
                 env=env,
             )
             predictions = [GLIPPrediction.from_json(file.read_text()) for file in sorted(Path(out_dir).glob("*.json"))]
 
-        assert len(images_in_utterance) == len(predictions), f"{len(images_in_utterance)} != {len(predictions)}"
-        for image, prediction in zip(images_in_utterance, predictions):
+        assert len(corresponding_images) == len(predictions), f"{len(corresponding_images)} != {len(predictions)}"
+        for image, prediction in zip(corresponding_images, predictions):
             for phrase in phrases:
                 if cfg.no_query is False:
                     phrase_prediction = prediction.phrases[phrase.index + len(prediction.phrases) - len(phrases)]
