@@ -48,7 +48,11 @@ def run_mdetr(cfg: DictConfig, dataset_dir: Path, document: Document) -> PhraseG
     utterance_results: list[UtterancePrediction] = []
     sid2sentence: dict[str, Sentence] = {sentence.sid: sentence for sentence in document.sentences}
     for idx, utterance in enumerate(dataset_info.utterances):
-        start_index = math.ceil(utterance.start / 1000)
+        if idx >= 1:
+            prev_utterance = dataset_info.utterances[idx - 1]
+            start_index = math.ceil(prev_utterance.end / 1000)
+        else:
+            start_index = 0
         if idx + 1 < len(dataset_info.utterances):
             next_utterance = dataset_info.utterances[idx + 1]
             end_index = math.ceil(next_utterance.start / 1000)

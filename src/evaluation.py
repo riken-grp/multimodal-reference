@@ -173,7 +173,7 @@ class MMRefEvaluator:
         prediction: PhraseGroundingPrediction,
         recall_top_ks: list[int],
         confidence_threshold: float = 0.0,
-        image_span: Literal["past", "current", "all"] = "current",
+        image_span: Literal["past-current", "prev-current", "current", "prev-next", "current-next"] = "current-next",
     ) -> list[dict[str, Any]]:
         recall_rects, precision_rects = self._compare_prediction_and_annotation(prediction, image_span=image_span)
 
@@ -235,7 +235,7 @@ class MMRefEvaluator:
     def _compare_prediction_and_annotation(
         self,
         prediction: PhraseGroundingPrediction,
-        image_span: Literal["past", "current", "all"] = "current",
+        image_span: Literal["past-current", "prev-current", "current", "prev-next", "current-next"] = "current-next",
     ) -> tuple[dict, dict]:
         recall_rects: dict[tuple[Any, ...], list[tuple[float, float]]] = {}
         precision_rects: dict[tuple[Any, ...], list[tuple[float, float]]] = {}
@@ -253,17 +253,26 @@ class MMRefEvaluator:
             assert "".join(bp.text for bp in base_phrases) == utterance_annotation.text == utterance_prediction.text
             start_index = math.ceil(utterance.start / 1000)
             end_index = math.ceil(utterance.end / 1000)
+            if idx >= 1:
+                prev_utterance = self.dataset_info.utterances[idx - 1]
+                prev_end_index = math.ceil(prev_utterance.end / 1000)
+            else:
+                prev_end_index = 0
             if idx + 1 < len(self.dataset_info.utterances):
                 next_utterance = self.dataset_info.utterances[idx + 1]
                 next_start_index = math.ceil(next_utterance.start / 1000)
             else:
                 next_start_index = len(all_image_ids)
-            if image_span == "past":
+            if image_span == "past-current":
                 image_ids = all_image_ids[:end_index]
+            elif image_span == "prev-current":
+                image_ids = all_image_ids[prev_end_index:end_index]
             elif image_span == "current":
+                image_ids = all_image_ids[start_index:end_index]
+            elif image_span == "prev-next":
+                image_ids = all_image_ids[prev_end_index:next_start_index]
+            elif image_span == "current-next":
                 image_ids = all_image_ids[start_index:next_start_index]
-            elif image_span == "all":
-                image_ids = all_image_ids
             else:
                 raise ValueError(f"Unknown image_span: {image_span}")
             for image_id, (base_phrase, phrase_annotation, phrase_prediction) in itertools.product(
@@ -289,7 +298,9 @@ class MMRefEvaluator:
                     if gold_bounding_box.class_name == "region":
                         continue
                     frame_msec = image_id_to_msec(image_id)
-                    if utterance.start <= frame_msec < (utterance.start + utterance.end) / 2:
+                    if frame_msec < utterance.start:
+                        temporal_location = "before"
+                    elif utterance.start <= frame_msec < (utterance.start + utterance.end) / 2:
                         temporal_location = "first_half"
                     elif (utterance.start + utterance.end) / 2 <= frame_msec < utterance.end:
                         temporal_location = "second_half"
@@ -340,7 +351,9 @@ class MMRefEvaluator:
                         )
                     ]
                     frame_msec = image_id_to_msec(image_id)
-                    if utterance.start <= frame_msec < (utterance.start + utterance.end) / 2:
+                    if frame_msec < utterance.start:
+                        temporal_location = "before"
+                    elif utterance.start <= frame_msec < (utterance.start + utterance.end) / 2:
                         temporal_location = "first_half"
                     elif (utterance.start + utterance.end) / 2 <= frame_msec < utterance.end:
                         temporal_location = "second_half"
@@ -430,6 +443,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--raw-result-csv", type=Path, default=None, help="Path to the raw result csv file.")
     parser.add_argument("--column-prefixes", type=str, nargs="*", default=None, help="Path to the raw result csv file.")
+    parser.add_argument(
+        "--image-span",
+        type=str,
+        default="current-next",
+        choices=["past-current", "prev-current", "current", "prev-next", "current-next"],
+        help="Image span to evaluate.",
+    )
     return parser.parse_args()
 
 
@@ -461,7 +481,10 @@ def main() -> None:
                 args.prediction_mmref_dir.joinpath(f"{scenario_id}.json").read_text()
             )
             eval_results["mmref"] += evaluator.eval_visual_reference(
-                prediction, recall_top_ks=args.recall_topk, confidence_threshold=args.confidence_threshold
+                prediction,
+                recall_top_ks=args.recall_topk,
+                confidence_threshold=args.confidence_threshold,
+                image_span=args.image_span,
             )
 
     if "text" in args.eval_modes:
