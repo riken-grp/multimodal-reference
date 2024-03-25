@@ -235,7 +235,7 @@ class MMRefEvaluator:
     def _compare_prediction_and_annotation(
         self,
         prediction: PhraseGroundingPrediction,
-        image_span: Literal["past-current", "prev-current", "current", "prev-next", "current-next"] = "current-next",
+        image_span: Literal["past-current", "prev-current", "current", "prev-next", "current-next"],
     ) -> tuple[dict, dict]:
         recall_rects: dict[tuple[Any, ...], list[tuple[float, float]]] = {}
         precision_rects: dict[tuple[Any, ...], list[tuple[float, float]]] = {}
