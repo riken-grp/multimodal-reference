@@ -49,7 +49,21 @@ poetry install
 
 ## Setup cohesion analyzer
 
-TBW
+1. Clone [nobu-g/cohesion-analysis](https://github.com/nobu-g/cohesion-analysis) and checkout `jcre3` branch.
+
+    ```shell
+    git clone git@github.com:nobu-g/cohesion-analysis.git
+    cd cohesion-analysis
+    git checkout jcre3
+    ```
+
+2. Follow the instructions in [nobu-g/cohesion-analysis](https://github.com/nobu-g/cohesion-analysis) to set up the Python virtual environment.
+
+4. Download the pre-trained checkpoint file.
+
+    ```shell
+    wget https://lotus.kuee.kyoto-u.ac.jp/~ueda/dist/cohesion_analysis_v2/model_jcre3_large.bin
+    ```
 
 ## Run Prediction
 
