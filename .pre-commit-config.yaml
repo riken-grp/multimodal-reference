@@ -1,22 +1,22 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-yaml
       - id: check-toml
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.4
+    rev: v0.7.2
     hooks:
       - id: ruff
         args: [ --fix, --exit-non-zero-on-fix ]
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 24.3.0
+    rev: 24.10.0
     hooks:
       - id: black
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
+    rev: v1.13.0
     hooks:
       - id: mypy
         additional_dependencies:
@@ -25,5 +25,5 @@ repos:
           - polars==0.19.19
           - dataclasses-json
           - omegaconf
-          - luigi
+          - git+https://github.com/spotify/luigi.git@master
           - types-tabulate
