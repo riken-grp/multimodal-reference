@@ -6,6 +6,7 @@ defaults:
   - glip: example.yaml
   - detic: default.yaml
   - mot: example.yaml
+  - som: example.yaml
   - _self_
 
 prediction_dir: ${result_dir}/mmref/${name}

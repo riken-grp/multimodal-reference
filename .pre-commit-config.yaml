@@ -27,3 +27,4 @@ repos:
           - omegaconf
           - git+https://github.com/spotify/luigi.git@master
           - types-tabulate
+          - types-requests
