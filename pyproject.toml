@@ -29,7 +29,7 @@ pytest = "^7.2.0"
 
 [tool.black]
 line-length = 120
-target-version = ["py39", "py310"]
+target-version = ["py39", "py310", "py311"]
 
 [tool.ruff]
 line-length = 120
@@ -61,5 +61,5 @@ ignore = [
 ban-relative-imports = "all"
 
 [tool.mypy]
-python_version = 3.9
+python_version = "3.9"
 plugins = ["luigi.mypy"]
