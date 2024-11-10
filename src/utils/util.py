@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from typing import Any, Union
 
 from dataclasses_json import DataClassJsonMixin, LetterCase, config
+from rhoknp import BasePhrase, Phrase
 
-number = Union[int, float]
+Number = Union[int, float]
 
 
 class CamelCaseDataClassJsonMixin(DataClassJsonMixin):
@@ -64,14 +65,14 @@ class Rectangle(CamelCaseDataClassJsonMixin):
         return self.w * self.h
 
     @classmethod
-    def from_xyxy(cls, x1: number, y1: number, x2: number, y2: number) -> "Rectangle":
+    def from_xyxy(cls, x1: Number, y1: Number, x2: Number, y2: Number) -> "Rectangle":
         return cls(*map(int, (x1, y1, x2, y2)))
 
     def to_xyxy(self) -> tuple[int, int, int, int]:
         return min(self.x1, self.x2), min(self.y1, self.y2), max(self.x1, self.x2), max(self.y1, self.y2)
 
     @classmethod
-    def from_cxcywh(cls, x: number, y: number, w: number, h: number) -> "Rectangle":
+    def from_cxcywh(cls, x: Number, y: Number, w: Number, h: Number) -> "Rectangle":
         if w < 0 or h < 0:
             raise ValueError("w and h must be positive")
         return cls.from_xyxy(x - w / 2, y - h / 2, x + w / 2, y + h / 2)
@@ -80,7 +81,7 @@ class Rectangle(CamelCaseDataClassJsonMixin):
         return self.cx, self.cy, self.w, self.h
 
     @classmethod
-    def from_xywh(cls, top_left_x: number, top_left_y: number, w: number, h: number) -> "Rectangle":
+    def from_xywh(cls, top_left_x: Number, top_left_y: Number, w: Number, h: Number) -> "Rectangle":
         if w < 0 or h < 0:
             raise ValueError("w and h must be positive")
         return cls.from_xyxy(top_left_x, top_left_y, top_left_x + w, top_left_y + h)
@@ -134,3 +135,27 @@ def image_id_to_frame_index(image_id: str) -> int:
 
 def image_id_to_msec(image_id: str) -> int:
     return (int(image_id) - 1) * 1000
+
+
+def get_core_expression(unit: Union[BasePhrase, Phrase]) -> tuple[str, str, str]:
+    """A core expression without ancillary words."""
+    morphemes = unit.morphemes
+    sidx = 0
+    for i, morpheme in enumerate(morphemes):
+        if morpheme.pos not in ("助詞", "特殊", "判定詞"):
+            sidx += i
+            break
+    eidx = len(morphemes)
+    for i, morpheme in enumerate(reversed(morphemes)):
+        if morpheme.pos not in ("助詞", "特殊", "判定詞"):
+            eidx -= i
+            break
+    ret = "".join(m.text for m in morphemes[sidx:eidx])
+    if not ret:
+        sidx = 0
+        eidx = len(morphemes)
+    return (
+        "".join(m.text for m in morphemes[:sidx]),
+        "".join(m.text for m in morphemes[sidx:eidx]),
+        "".join(m.text for m in morphemes[eidx:]),
+    )

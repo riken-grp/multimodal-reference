@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from itertools import cycle, repeat
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +18,7 @@ from rhoknp import BasePhrase, Document, Sentence
 from utils.annotation import ImageAnnotation, ImageTextAnnotation, PhraseAnnotation
 from utils.constants import RELATION_TYPES_ALL
 from utils.prediction import PhraseGroundingPrediction, PhrasePrediction
-from utils.util import DatasetInfo, IdMapper, Rectangle
+from utils.util import DatasetInfo, IdMapper, Rectangle, get_core_expression
 
 GOLD_COLOR = (1.0, 1.0, 1.0)  # white
 
@@ -28,30 +28,6 @@ class LabeledRectangle:
     rect: Rectangle
     color: tuple[float, float, float]
     label: str
-
-
-def get_core_expression(unit: Union[BasePhrase]) -> tuple[str, str, str]:
-    """A core expression without ancillary words."""
-    morphemes = unit.morphemes
-    sidx = 0
-    for i, morpheme in enumerate(morphemes):
-        if morpheme.pos not in ("助詞", "特殊", "判定詞"):
-            sidx += i
-            break
-    eidx = len(morphemes)
-    for i, morpheme in enumerate(reversed(morphemes)):
-        if morpheme.pos not in ("助詞", "特殊", "判定詞"):
-            eidx -= i
-            break
-    ret = "".join(m.text for m in morphemes[sidx:eidx])
-    if not ret:
-        sidx = 0
-        eidx = len(morphemes)
-    return (
-        "".join(m.text for m in morphemes[:sidx]),
-        "".join(m.text for m in morphemes[sidx:eidx]),
-        "".join(m.text for m in morphemes[eidx:]),
-    )
 
 
 def box_iou(box1: Bbox, box2: Bbox) -> float:
