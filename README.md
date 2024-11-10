@@ -33,7 +33,7 @@ poetry install
     ln -s /somewhere/J-CRe3/id ./data/id
     ln -s /somewhere/J-CRe3/recording ./data/recording
     ln -s /somewhere/J-CRe3/recording ./data/dataset
-   ```
+    ```
 
 ## Setup GLIP
 
