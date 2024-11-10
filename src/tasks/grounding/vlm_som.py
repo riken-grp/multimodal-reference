@@ -1,26 +1,41 @@
 import base64
+import io
+import json
 import math
-import pickle
 import sys
 import textwrap
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import luigi
-import numpy as np
+import PIL.Image
 import requests
 from omegaconf import DictConfig
 from openai import OpenAI
-from rhoknp import Document, Sentence
+from PIL.Image import Image
+from pydantic import BaseModel
+from rhoknp import BasePhrase, Document, Sentence
 
-from utils.prediction import BoundingBox as BoundingBoxPrediction
 from utils.prediction import (
+    BoundingBox,
     PhraseGroundingPrediction,
     PhrasePrediction,
     RelationPrediction,
     UtterancePrediction,
 )
-from utils.util import DatasetInfo, Rectangle
+from utils.util import DatasetInfo, Rectangle, UtteranceInfo, get_core_expression
+
+SOM_API_URL = "http://moss110:6093/mark"
+
+
+class Phrase(BaseModel):
+    index: int
+    text: str
+    referred_object_ids: list[int]
+
+
+class PhraseGroundingResult(BaseModel):
+    phrases: list[Phrase]
 
 
 class SoMPhraseGrounding(luigi.Task):
@@ -32,17 +47,19 @@ class SoMPhraseGrounding(luigi.Task):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         Path(self.cfg.prediction_dir).mkdir(exist_ok=True, parents=True)
+        self.mark_dir = Path(self.cfg.prediction_dir) / self.scenario_id
+        self.client = OpenAI()
 
-    # def requires(self) -> luigi.Task:
-    #     return hydra.utils.instantiate(self.cfg.detection, scenario_id=self.scenario_id)
+    def requires(self) -> luigi.Task:
+        return SoMMarking(
+            scenario_id=self.scenario_id, cfg=self.cfg, document_path=self.document_path, dataset_dir=self.dataset_dir
+        )
 
     def output(self) -> luigi.LocalTarget:
         return luigi.LocalTarget(f"{self.cfg.prediction_dir}/{self.scenario_id}.json")
 
     def run(self) -> None:
-        with self.input().open(mode="r") as f:
-            detection_dump: list[np.ndarray] = pickle.load(f)
-
+        image_id_to_masks: dict[str, list[dict[str, Any]]] = json.loads(self.input().open().read())
         utterance_predictions: list[UtterancePrediction] = []
         document = Document.from_knp(self.document_path.read_text())
         dataset_info = DatasetInfo.from_json(self.dataset_dir.joinpath("info.json").read_text())
@@ -54,7 +71,9 @@ class SoMPhraseGrounding(luigi.Task):
                 end_index = math.ceil(next_utterance.start / 1000)
             else:
                 end_index = len(dataset_info.images)
-            corresponding_images = dataset_info.images[start_index:end_index]
+            corresponding_image_ids: list[str] = [
+                image_info.id for image_info in dataset_info.images[start_index:end_index]
+            ]
             caption = Document.from_sentences([sid2sentence[sid] for sid in utterance.sids])
             phrase_predictions: list[PhrasePrediction] = [
                 PhrasePrediction(
@@ -65,21 +84,65 @@ class SoMPhraseGrounding(luigi.Task):
                 )
                 for base_phrase in caption.base_phrases
             ]
-            for phrase_prediction in phrase_predictions:
-                for image in corresponding_images:
-                    image_idx = int(image.id) - 1
-                    raw_bbs: np.ndarray = detection_dump[image_idx * 30]  # (bb, 6)
-                    for raw_bb in raw_bbs.tolist():
+            system_prompt = _get_system_prompt()
+            prompt = _get_prompt(dataset_info.utterances[:idx], utterance, caption.base_phrases)
+            print(prompt)
+            for image_id in corresponding_image_ids:
+                label_to_mask = {mask["label"]: mask for mask in image_id_to_masks[image_id]}
+                image_file = self.mark_dir / "images" / f"{image_id}.png"
+                with image_file.open(mode="rb") as f:
+                    marked_image_b64_str = base64.b64encode(f.read()).decode("utf-8")
+                media_type = "image/png"
+                completion = self.client.beta.chat.completions.parse(
+                    model=self.cfg.openai_model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": [
+                                {"type": "text", "text": system_prompt},
+                            ],
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:{media_type};base64,{marked_image_b64_str}"},
+                                },
+                            ],
+                        },
+                    ],
+                    response_format=PhraseGroundingResult,
+                )
+                message = completion.choices[0].message
+                if message.refusal:
+                    print(message.refusal)
+                    continue
+                result = message.parsed
+                assert isinstance(result, PhraseGroundingResult)
+                print(image_file)
+                print(result)
+                for grounded_phrase in result.phrases:
+                    if grounded_phrase.index < 0 or grounded_phrase.index >= len(phrase_predictions):
+                        print(f"Warning: Invalid index {grounded_phrase.index}", file=sys.stderr)
+                        continue
+                    phrase_prediction = phrase_predictions[grounded_phrase.index]
+                    if grounded_phrase.text not in phrase_prediction.text:
+                        print(f"Warning: {grounded_phrase.text} is not in {phrase_prediction.text}", file=sys.stderr)
+                    for object_id in grounded_phrase.referred_object_ids:
+                        label = str(object_id)
+                        if label not in label_to_mask:
+                            continue
+                        mask = label_to_mask[label]
                         phrase_prediction.relations.append(
                             RelationPrediction(
                                 type="=",
-                                image_id=image.id,
-                                bounding_box=BoundingBoxPrediction(
-                                    image_id=image.id,
-                                    rect=Rectangle(
-                                        x1=raw_bb[0] / 2, y1=raw_bb[1] / 2, x2=raw_bb[2] / 2, y2=raw_bb[3] / 2
-                                    ),
-                                    confidence=raw_bb[4],
+                                image_id=image_id,
+                                bounding_box=BoundingBox(
+                                    image_id=image_id,
+                                    rect=Rectangle.from_xywh(*mask["bbox"]),
+                                    confidence=1.0,
                                 ),
                             )
                         )
@@ -98,67 +161,108 @@ class SoMPhraseGrounding(luigi.Task):
             f.write(prediction.to_json(ensure_ascii=False, indent=2))
 
 
-def _get_prompt(context_utterances: list, target_utterance) -> str:
+class SoMMarking(luigi.Task):
+    scenario_id: Annotated[str, luigi.Parameter()] = luigi.Parameter()
+    cfg: Annotated[DictConfig, luigi.Parameter()] = luigi.Parameter()
+    document_path: Annotated[Path, luigi.Parameter()] = luigi.PathParameter()
+    dataset_dir: Annotated[Path, luigi.PathParameter()] = luigi.PathParameter()
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.mark_dir = Path(self.cfg.prediction_dir) / self.scenario_id
+        self.mark_dir.mkdir(exist_ok=True, parents=True)
+        self.marked_image_dir = self.mark_dir / "images"
+        self.marked_image_dir.mkdir(exist_ok=True, parents=True)
+
+    def output(self) -> luigi.LocalTarget:
+        return luigi.LocalTarget(f"{self.mark_dir}/masks.json")
+
+    def run(self) -> None:
+        masks: dict[str, list] = {}
+        for image_path in sorted(self.dataset_dir.glob("images/*.png")):
+            with image_path.open(mode="rb") as f:
+                base64_str = base64.b64encode(f.read()).decode("utf-8")
+
+            response = requests.post(
+                SOM_API_URL,
+                json={"base64_str": base64_str, "granularity": self.cfg.segmentation_granularity},
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            image = base64_to_pil(result["base64_str"])
+            image.save(f"{self.marked_image_dir}/{image_path.name}")
+
+            masks[image_path.stem] = result["masks"]
+
+        with self.output().open(mode="w") as f:
+            f.write(json.dumps(masks, ensure_ascii=False, indent=2))
+
+
+def base64_to_pil(base64_str: str) -> Image:
+    if ";base64," in base64_str:
+        base64_str = base64_str.split(";base64,")[1]
+
+    img_data = base64.b64decode(base64_str)
+    img_buffer = io.BytesIO(img_data)
+    img = PIL.Image.open(img_buffer)
+    return img
+
+
+def pil_to_base64(image: Image, format: str = "PNG") -> str:
+    """
+    PIL.Image オブジェクトを base64 文字列に変換する
+
+    Args:
+        image (PIL.Image.Image): 変換する PIL Image オブジェクト
+        format (str): 画像フォーマット (デフォルト: "PNG")
+
+    Returns:
+        str: base64 エンコードされた文字列
+    """
+    buffered = io.BytesIO()
+    image.save(buffered, format=format)
+    img_str = base64.b64encode(buffered.getvalue())
+    return img_str.decode("utf-8")
+
+
+def _get_system_prompt() -> str:
+    return textwrap.dedent(
+        """\
+        You are a super-intelligent household robot that helps your master with daily mundane tasks.
+        Given a dialogue context, target utterance, and a household scene image, identify specific objects or areas referenced by each phrase in the target utterance. This task is also known as phrase grounding.
+        Each visual object in the image is labeled with a bright numeric ID at its center. Your task is to output the corresponding object ID for each target phrase where an object is referenced.
+
+        Note the following key points:
+        - Noisy Target Phrases: Some target phrases include verbs, adverbs, or interjections that do not reference any physical object. For such phrases, return an empty object ID.
+        - Object Availability: Even if a target phrase uses a noun or otherwise implies a physical object, the referenced object may not appear in the image. In these cases, return an empty object ID.
+
+        Assume that the scene could occur in various household settings (e.g., living room, dining area, kitchen), with a range of typical household items (e.g., cleaning tools, kitchen utensils, furniture). Use both visual and linguistic clues to determine references within the image.
+        """
+    )
+
+
+def _get_prompt(
+    context_utterances: list[UtteranceInfo], target_utterance: UtteranceInfo, base_phrases: list[BasePhrase]
+) -> str:
+    core_expressions = [get_core_expression(base_phrase) for base_phrase in base_phrases]
     prompt = textwrap.dedent(
         """\
-        I have labeled a bright numeric ID at the center for each visual object in the image.
-        Given the image and an related utterance and its dialogue context,
-        find the corresponding regions for 「ここ」, 「棚」, 「下」 if any.
-        The response must be a JSON format like the following:
-        {'ここ': [1], '棚': [4], '下': null}
+        Analyze the following dialogue context and target utterance (「{}」) to determine the corresponding object IDs for each target phrase.
+        Each visual object in the image is labeled with a bright numeric ID at its center.
+
+        For each target phrase:
+        - Identify and provide the numeric object ID(s) if the phrase references one or more objects visible in the image.
+        - Leave the object ID field empty if the phrase does not reference a physical object or if the referenced object is not visible in the image.
 
         ## Dialogue Context
         """
-    )
+    ).format(target_utterance.text)
     for utterance in context_utterances:
         prompt += f"{utterance.speaker}: {utterance.text}\n"
-    prompt += "## Target Utterance\n"
+    prompt += "\n## Target Utterance\n"
     prompt += f"{target_utterance.speaker}: {target_utterance.text}\n"
+    prompt += "\n## Target Phrases\n"
+    for idx, core_expression in enumerate(core_expressions):
+        prompt += f"{idx}. {core_expression[1]}\n"
     return prompt
-
-
-def main() -> None:
-    dataset_dir = Path("data/dataset/20220302-56133195-2/info.json")
-    dataset_info = DatasetInfo.from_json(dataset_dir.read_text())
-    image_path = dataset_dir / "images" / "005.png"
-    with image_path.open(mode="rb") as f:
-        base64_str = base64.b64encode(f.read()).decode("utf-8")
-
-    try:
-        response = requests.post("http://localhost:6093/mark", json={"base64_str": base64_str})
-        response.raise_for_status()
-        result = response.json()
-    except requests.RequestException as e:
-        print(e, file=sys.stderr)
-    except Exception as e:
-        print(e, file=sys.stderr)
-
-    context_utterances = dataset_info.utterances[:10]
-    utterance = dataset_info.utterances[10]
-    prompt = _get_prompt(context_utterances, utterance)
-
-    print(result)
-    marked_image_b64_str = result["base64_str"]
-    img_type = "png"
-    client = OpenAI()
-    response = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{img_type};base64,{marked_image_b64_str}"},
-                    },
-                ],
-            }
-        ],
-        model="gpt-4o-2024-08-06",
-    )
-
-    print(response)
-
-
-if __name__ == "__main__":
-    main()
