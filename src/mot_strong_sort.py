@@ -12,7 +12,7 @@ from utils.mot import BoundingBox, DetectionLabels, Frame, frame_from_video
 from utils.util import Rectangle
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Tracking Sample")
     parser.add_argument("video", help="Input video file", type=Path)
     parser.add_argument("--output-video", default=None, help="Output video file", type=Path)
@@ -22,7 +22,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     args = parse_args()
 
     # Tracker
