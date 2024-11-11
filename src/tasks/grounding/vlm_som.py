@@ -5,7 +5,7 @@ import math
 import sys
 import textwrap
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import luigi
 import PIL.Image
@@ -15,6 +15,7 @@ from openai import OpenAI
 from PIL.Image import Image
 from pydantic import BaseModel
 from rhoknp import BasePhrase, Document, Sentence
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from utils.prediction import (
     BoundingBox,
@@ -84,42 +85,14 @@ class SoMPhraseGrounding(luigi.Task):
                 )
                 for base_phrase in caption.base_phrases
             ]
-            system_prompt = _get_system_prompt()
             prompt = _get_prompt(dataset_info.utterances[:idx], utterance, caption.base_phrases)
             print(prompt)
             for image_id in corresponding_image_ids:
                 label_to_mask = {mask["label"]: mask for mask in image_id_to_masks[image_id]}
                 image_file = self.mark_dir / "images" / f"{image_id}.png"
-                with image_file.open(mode="rb") as f:
-                    marked_image_b64_str = base64.b64encode(f.read()).decode("utf-8")
-                media_type = "image/png"
-                completion = self.client.beta.chat.completions.parse(
-                    model=self.cfg.openai_model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": [
-                                {"type": "text", "text": system_prompt},
-                            ],
-                        },
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:{media_type};base64,{marked_image_b64_str}"},
-                                },
-                            ],
-                        },
-                    ],
-                    response_format=PhraseGroundingResult,
-                )
-                message = completion.choices[0].message
-                if message.refusal:
-                    print(message.refusal)
+                result = self._call_openai(image_file, prompt)
+                if result is None:
                     continue
-                result = message.parsed
                 assert isinstance(result, PhraseGroundingResult)
                 print(image_file)
                 print(result)
@@ -159,6 +132,20 @@ class SoMPhraseGrounding(luigi.Task):
 
         with self.output().open(mode="w") as f:
             f.write(prediction.to_json(ensure_ascii=False, indent=2))
+
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(60 * 10))
+    def _call_openai(self, image_file: Path, prompt: str) -> Optional[PhraseGroundingResult]:
+        body = {
+            "model": self.cfg.openai_model,
+            "messages": _gen_messages(image_file, prompt),
+            "response_format": PhraseGroundingResult,
+        }
+        completion = self.client.beta.chat.completions.parse(**body)
+        message = completion.choices[0].message
+        if message.refusal:
+            print(message.refusal)
+            return None
+        return message.parsed
 
 
 class SoMMarking(luigi.Task):
@@ -210,20 +197,35 @@ def base64_to_pil(base64_str: str) -> Image:
 
 
 def pil_to_base64(image: Image, format: str = "PNG") -> str:
-    """
-    PIL.Image オブジェクトを base64 文字列に変換する
-
-    Args:
-        image (PIL.Image.Image): 変換する PIL Image オブジェクト
-        format (str): 画像フォーマット (デフォルト: "PNG")
-
-    Returns:
-        str: base64 エンコードされた文字列
-    """
     buffered = io.BytesIO()
     image.save(buffered, format=format)
-    img_str = base64.b64encode(buffered.getvalue())
-    return img_str.decode("utf-8")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+
+def _gen_messages(image_file: Path, user_prompt: str) -> list[dict[str, Any]]:
+    system_prompt = _get_system_prompt()
+    with image_file.open(mode="rb") as f:
+        marked_image_b64_str = base64.b64encode(f.read()).decode("utf-8")
+    media_type = "image/png"
+    messages: list[dict[str, Any]] = [
+        {
+            "role": "system",
+            "content": [
+                {"type": "text", "text": system_prompt},
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": user_prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{media_type};base64,{marked_image_b64_str}"},
+                },
+            ],
+        },
+    ]
+    return messages
 
 
 def _get_system_prompt() -> str:
