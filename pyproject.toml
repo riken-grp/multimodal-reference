@@ -22,6 +22,7 @@ pyarrow = "^14.0"
 plotly = "^5.18"
 torchmetrics = { version = "^1.2", extras = ["detection"] }
 openai = "^1.53.0"
+tenacity = ">=8.5.0"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
