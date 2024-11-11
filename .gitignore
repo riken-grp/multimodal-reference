@@ -178,3 +178,4 @@ configs/*/*.yaml
 !configs/detection/detic.yaml
 !configs/detection/devit.yaml
 !configs/detection/glip.yaml
+!configs/som/example.yaml

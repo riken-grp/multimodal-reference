@@ -26,8 +26,6 @@ from utils.prediction import (
 )
 from utils.util import DatasetInfo, Rectangle, UtteranceInfo, get_core_expression
 
-SOM_API_URL = "http://moss110:6093/mark"
-
 
 class Phrase(BaseModel):
     index: int
@@ -171,7 +169,7 @@ class SoMMarking(luigi.Task):
                 base64_str = base64.b64encode(f.read()).decode("utf-8")
 
             response = requests.post(
-                SOM_API_URL,
+                self.cfg.som_api_url,
                 json={"base64_str": base64_str, "granularity": self.cfg.segmentation_granularity},
             )
             response.raise_for_status()
